@@ -1,14 +1,14 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       hydsolver.c
  Description:  computes flows and pressures throughout a pipe network using
                Todini's Global Gradient Algorithm
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 02/14/2022
+ Last Updated: 04/23/2024
  ******************************************************************************
 */
 
@@ -595,8 +595,10 @@ void  checkhydbalance(Project *pr, Hydbalance *hbal)
     headlosscoeffs(pr);
     for (k = 1; k <= net->Nlinks; k++)
     {
+        // Skip closed links and active valves
         if (hyd->LinkStatus[k] <= CLOSED) continue;
-        if (hyd->P[k] == 0.0) continue;
+        if (hyd->P[k] <= 1.0/CBIG) continue;
+        
         link = &net->Link[k];
         n1 = link->N1;
         n2 = link->N2;
@@ -610,7 +612,6 @@ void  checkhydbalance(Project *pr, Hydbalance *hbal)
         }
     }
 }
-
 
 int  hasconverged(Project *pr, double *relerr, Hydbalance *hbal)
 /*

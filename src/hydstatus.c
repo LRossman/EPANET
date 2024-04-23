@@ -1,13 +1,13 @@
 /*
 ******************************************************************************
 Project:      OWA EPANET
-Version:      2.2
+Version:      2.3
 Module:       hydstatus.c
 Description:  updates hydraulic status of network elements
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 02/03/2023
+Last Updated: 04/23/2024
 ******************************************************************************
 */
 
@@ -22,11 +22,8 @@ int  valvestatus(Project *);
 int  linkstatus(Project *);
 
 // Local functions
-static StatusType cvstatus(Project *, StatusType, double, double);
-static StatusType pumpstatus(Project *, int, double);
 static StatusType prvstatus(Project *, int, StatusType, double, double, double);
 static StatusType psvstatus(Project *, int, StatusType, double, double, double);
-static StatusType fcvstatus(Project *, int, StatusType, double, double);
 static void       tankstatus(Project *, int, int, double);
 
 
@@ -135,25 +132,6 @@ int  linkstatus(Project *pr)
             hyd->LinkStatus[k] = OPEN;
         }
 
-        // Check for status changes in CVs and pumps
-        if (link->Type == CVPIPE)
-        {
-            hyd->LinkStatus[k] = cvstatus(pr, hyd->LinkStatus[k], dh,
-                                          hyd->LinkFlow[k]);
-        }
-        if (link->Type == PUMP && hyd->LinkStatus[k] >= OPEN &&
-            hyd->LinkSetting[k] > 0.0)
-        {
-            hyd->LinkStatus[k] = pumpstatus(pr, k, -dh);
-        }
-
-        // Check for status changes in non-fixed FCVs
-        if (link->Type == FCV && hyd->LinkSetting[k] != MISSING)
-        {
-            hyd->LinkStatus[k] = fcvstatus(pr, k, status, hyd->NodeHead[n1],
-                                           hyd->NodeHead[n2]);
-        }
-
         // Check for flow into (out of) full (empty) tanks
         if (n1 > net->Njuncs) tankstatus(pr, k, n1, hyd->LinkFlow[k]);
         if (n2 > net->Njuncs) tankstatus(pr, k, n2, -hyd->LinkFlow[k]);
@@ -169,72 +147,6 @@ int  linkstatus(Project *pr)
         }
     }
     return change;
-}
-
-
-StatusType  cvstatus(Project *pr, StatusType s, double dh, double q)
-/*
-**--------------------------------------------------
-**  Input:   s  = current link status
-**           dh = head loss across link
-**           q  = link flow
-**  Output:  returns new link status
-**  Purpose: updates status of a check valve link.
-**--------------------------------------------------
-*/
-{
-    Hydraul *hyd = &pr->hydraul;
-
-    // Prevent reverse flow through CVs
-    if (ABS(dh) > hyd->Htol)
-    {
-        if (dh < -hyd->Htol)     return CLOSED;
-        else if (q < -hyd->Qtol) return CLOSED;
-        else                     return OPEN;
-    }
-    else
-    {
-        if (q < -hyd->Qtol) return CLOSED;
-        else                return s;
-    }
-}
-
-
-StatusType  pumpstatus(Project *pr, int k, double dh)
-/*
-**--------------------------------------------------
-**  Input:   k  = link index
-**           dh = head gain across link
-**  Output:  returns new pump status
-**  Purpose: updates status of an open pump.
-**--------------------------------------------------
-*/
-{
-    Hydraul *hyd = &pr->hydraul;
-    Network *net = &pr->network;
-
-    int   p;
-    double hmax;
-
-    // Find maximum head (hmax) pump can deliver
-    p = findpump(net, k);
-    if (net->Pump[p].Ptype == CONST_HP)
-    {
-        // Use huge value for constant HP pump
-        hmax = BIG;
-        if (hyd->LinkFlow[k] < TINY) return TEMPCLOSED;
-    }
-    else
-    {
-        // Use speed-adjusted shut-off head for other pumps
-        hmax = SQR(hyd->LinkSetting[k]) * net->Pump[p].Hmax;
-    }
-
-    // Check if currrent head gain exceeds pump's max. head
-    if (dh > hmax + hyd->Htol) return XHEAD;
-
-    // No check is made to see if flow exceeds pump's max. flow
-    return OPEN;
 }
 
 
@@ -354,54 +266,6 @@ StatusType  psvstatus(Project *pr, int k, StatusType s, double hset,
     default:
         break;
     }
-    return status;
-}
-
-
-StatusType  fcvstatus(Project *pr, int k, StatusType s, double h1, double h2)
-/*
-**-----------------------------------------------------------
-**  Input:   k    = link index
-**           s    = current status
-**           h1   = head at upstream node
-**           h2   = head at downstream node
-**  Output:  returns new valve status
-**  Purpose: updates status of a flow control valve.
-**
-**    Valve status changes to XFCV if flow reversal.
-**    If current status is XFCV and current flow is
-**    above setting, then valve becomes active.
-**    If current status is XFCV, and current flow
-**    positive but still below valve setting, then
-**    status remains same.
-**-----------------------------------------------------------
-*/
-{
-    Hydraul *hyd = &pr->hydraul;
-    StatusType status;            // New valve status
-
-    status = s;
-    if (h1 - h2 < -hyd->Htol)
-    {
-        status = XFCV;
-    }
-    else if (hyd->LinkFlow[k] < -hyd->Qtol)
-    {
-        status = XFCV;
-    }
-    else if (s == XFCV && hyd->LinkFlow[k] >= hyd->LinkSetting[k])
-    {
-        status = ACTIVE;
-    }
-
-    // Active valve's loss coeff. can't be < fully open loss coeff.
-    else if (status == ACTIVE)
-    {
-        if ((h1 - h2) / SQR(hyd->LinkFlow[k]) < pr->network.Link[k].Km)
-        {
-            status = XFCV;
-        }
-    }        
     return status;
 }
 

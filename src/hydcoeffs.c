@@ -1,13 +1,13 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       hydcoeffs.c
  Description:  computes coefficients for a hydraulic solution matrix
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 03/29/2023
+ Last Updated: 04/23/2024
  ******************************************************************************
 */
 
@@ -31,8 +31,8 @@ const double AB = 3.28895476345399058690e-03;   // 5.74/(4000^.9)
 const double AC = -5.14214965799093883760e-03;  // AA*AB
 
 // Definitions of very small and very big coefficients
-const double CSMALL = 1.e-6;
-const double CBIG   = 1.e8;
+////const double CSMALL = 1.e-6;
+////const double CBIG   = 1.e8;
 
 // Exported functions
 //void   resistcoeff(Project *, int );
@@ -276,7 +276,7 @@ void headlosscoeffs(Project *pr)
         case GPV:
             gpvcoeff(pr, k);
             break;
-        case FCV:
+        case FCV:    
         case PRV:
         case PSV:
             if (hyd->LinkSetting[k] == MISSING) valvecoeff(pr, k);
@@ -648,6 +648,14 @@ void  pipecoeff(Project *pr, int k)
         return;
     }
 
+    // Do likewise for CV pipes with negative flow
+    if (pr->network.Link[k].Type == CVPIPE && hyd->LinkFlow[k] < 0.0)
+    {
+        hyd->P[k] = 1.0 / CBIG;
+        hyd->Y[k] = hyd->LinkFlow[k];
+        return;
+    }        
+
     // Use custom function for Darcy-Weisbach formula
     if (hyd->Formflag == DW)
     {
@@ -681,7 +689,7 @@ void  pipecoeff(Project *pr, int k)
 
     // Adjust head loss sign for flow direction
     hloss *= SGN(hyd->LinkFlow[k]);
-
+    
     // P and Y coeffs.
     hyd->P[k] = 1.0 / hgrad;
     hyd->Y[k] = hloss / hgrad;
@@ -812,11 +820,22 @@ void  pumpcoeff(Project *pr, int k)
         hyd->Y[k] = hyd->LinkFlow[k];
         return;
     }
-
+    
     // Obtain reference to pump object
     q = ABS(hyd->LinkFlow[k]);
     p = findpump(&pr->network, k);
     pump = &pr->network.Pump[p];
+
+    // Adjust head loss and gradient to prevent negative flow    
+    if (hyd->LinkFlow[k] < 0.0)
+    {
+        double hmax = SQR(hyd->LinkSetting[k]) * pump->Hmax;
+        hloss = -hmax + CBIG * hyd->LinkFlow[k];
+        hgrad = CBIG;
+        hyd->P[k] = 1.0 / hgrad;
+        hyd->Y[k] = hloss / hgrad;
+        return;
+    }        
 
     // If no pump curve treat pump as an open valve
     if (pump->Ptype == NOCURVE)
@@ -1221,7 +1240,7 @@ void  fcvcoeff(Project *pr, int k, int n1, int n2)
     // flow setting as external demand at upstream node
     // and external supply at downstream node.
 
-    if (hyd->LinkStatus[k] == ACTIVE)
+    if (hyd->LinkFlow[k] > q)
     {
         hyd->Xflow[n1] -= q;
         hyd->Xflow[n2] += q;

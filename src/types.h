@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 07/17/2023
+ Last Updated: 04/23/2024
  ******************************************************************************
 */
 
@@ -62,6 +62,14 @@ typedef  int          INT4;
 #else
   #define   PI        3.141592654
 #endif
+
+/*
+----------------------------------------------
+  Very small and very big coefficients
+----------------------------------------------
+*/
+#define CSMALL 1.e-6
+#define CBIG   1.e8
 
 /*
 ----------------------------------------------
