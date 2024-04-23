@@ -65,7 +65,7 @@ typedef  int          INT4;
 
 /*
 ----------------------------------------------
-  Very small and very big coefficients
+  Coefficients used by hydraulic solver
 ----------------------------------------------
 */
 #define CSMALL 1.e-6
