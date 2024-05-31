@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 11/15/2019
+ Last Updated: 09/28/2023
  ******************************************************************************
 */
 #ifndef FUNCS_H
@@ -19,6 +19,7 @@ void    initpointers(Project *);
 int     allocdata(Project *);
 void    freedata(Project *);
 
+int     openproject(Project *, const char *, const char *, const char *, int);
 int     openfiles(Project *, const char *, const char *,const char *);
 int     openhydfile(Project *);
 int     openoutfile(Project *);
@@ -29,16 +30,18 @@ void    freeadjlists(Network *);
 
 int     incontrols(Project *, int, int);
 int     valvecheck(Project *, int, int, int, int);
-int     findnode(Network *, char *);
-int     findlink(Network *, char *);
+int     unlinked(Project *);
+
+int     findnode(Network *, const char *);
+int     findlink(Network *, const char *);
 int     findtank(Network *, int);
 int     findvalve(Network *, int);
 int     findpump(Network *, int);
-int     findpattern(Network *, char *);
-int     findcurve(Network *, char *);
+int     findpattern(Network *, const char *);
+int     findcurve(Network *, const char *);
 
 Pdemand finddemand(Pdemand, int);
-int     adddemand(Snode *, double, int, char *);
+int     adddemand(Snode *, double, int, const char *);
 void    freedemands(Snode *);
 
 int     addlinkvertex(Slink *, double, double);
@@ -46,8 +49,8 @@ void    freelinkvertices(Slink *);
 
 void    adjustpatterns(Network *, int);
 void    adjustcurves(Network *, int);
-int     adjustpumpparams(Project *, int);
 int     resizecurve(Scurve *, int);
+int     setcontrol(Project *, int, int, double, int, double, Scontrol *);
 
 int     getcomment(Network *, int, int, char *);
 int     setcomment(Network *, int, int, const char *);
@@ -67,7 +70,7 @@ int     getdata(Project *);
 void    setdefaults(Project *);
 void    initreport(Report *);
 void    adjustdata(Project *);
-int     inittanks(Project *);
+void    inittanks(Project *);
 void    initunits(Project *);
 void    convertunits(Project *);
 
@@ -75,7 +78,6 @@ void    convertunits(Project *);
 
 int     netsize(Project *);
 int     readdata(Project *);
-int     updatepumpparams(Project *, int);
 int     findmatch(char *, char *[]);
 int     match(const char *, const char *);
 int     gettokens(char *, char **, int, char *);
@@ -117,22 +119,23 @@ void    freerules(Project *);
 int     ruledata(Project *);
 void    ruleerrmsg(Project *);
 void    adjustrules(Project *, int, int);
-void    adjusttankrules(Project *);
+void    adjusttankrules(Project *, int);
 Spremise *getpremise(Spremise *, int);
 Saction  *getaction(Saction *, int);
 int     writerule(Project *, FILE *, int);
 int     checkrules(Project *, long);
+void    updateruleunits(Project *pr, double dcf, double pcf, double hcf, double qcf);
 
 // ------- REPORT.C -----------------
 
 int     clearreport(Project *);
-int     copyreport(Project *, char *);
+int     copyreport(Project *, const char *);
 int     writereport(Project *);
 void    writelogo(Project *);
 void    writesummary(Project *);
 void    writehydstat(Project *, int, double);
 void    writeheader(Project *, int,int);
-void    writeline(Project *, char *);
+void    writeline(Project *, const char *);
 void    writerelerr(Project *, int, double);
 void    writestatchange(Project *, int,char,char);
 void    writecontrolaction(Project *, int, int);
@@ -153,6 +156,7 @@ void    closehyd(Project *);
 void    setlinkstatus(Project *, int, char, StatusType *, double *);
 void    setlinksetting(Project *, int, double, StatusType *, double *);
 int     tanktimestep(Project *, long *);
+int     controltimestep(Project *, long *);
 void    getenergy(Project *, int, double *, double *);
 double  tankvolume(Project *, int, double);
 double  tankgrade(Project *, int, double);
@@ -162,8 +166,9 @@ double  tankgrade(Project *, int, double);
 void    resistcoeff(Project *, int);
 void    headlosscoeffs(Project *);
 void    matrixcoeffs(Project *);
-void    emitterheadloss(Project *, int, double *, double *);           
+void    emitterheadloss(Project *, int, double *, double *);
 void    demandheadloss(Project *, int, double, double, double *, double *);
+double  pcvlosscoeff(Project *, int, double);
 
 // ------- QUALITY.C --------------------
 

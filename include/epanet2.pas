@@ -3,7 +3,7 @@ unit epanet2;
 { Declarations of imported procedures from the EPANET PROGRAMMERs TOOLKIT }
 { (EPANET2.DLL) }
 
-{Last updated on 11/12/19}
+{Last updated on 09/28/2023}
 
 interface
 
@@ -12,7 +12,9 @@ const
 { These are codes used by the DLL functions }
  EN_MAXID = 31;        { Max. # characters in ID name }
  EN_MAXMSG = 255;      { Max. # characters in strings }
- EN_MISSING = -1.E10;
+ EN_MISSING = -1.0E10;
+ EN_SET_CLOSED = -1.0E10;
+ EN_SET_OPEN = 1.0E10;
 
  EN_ELEVATION  = 0;    { Node parameters }
  EN_BASEDEMAND = 1;
@@ -31,7 +33,6 @@ const
  EN_INITVOLUME = 14;
  EN_MIXMODEL   = 15;
  EN_MIXZONEVOL = 16;
-
  EN_TANKDIAM    = 17;
  EN_MINVOLUME   = 18;
  EN_VOLCURVE    = 19;
@@ -42,7 +43,9 @@ const
  EN_TANKVOLUME  = 24;
  EN_MAXVOLUME   = 25;
  EN_CANOVERFLOW = 26;
- EN_DEMANDDEFICIT = 27;  
+ EN_DEMANDDEFICIT = 27;
+ EN_NODE_INCONTROL = 28;
+ EN_EMITTERFLOW = 29;
 
  EN_DIAMETER    = 0;    { Link parameters }
  EN_LENGTH      = 1;
@@ -67,6 +70,9 @@ const
  EN_PUMP_ECURVE = 20;
  EN_PUMP_ECOST  = 21;
  EN_PUMP_EPAT   = 22;
+ EN_LINK_INCONTROL = 23;
+ EN_GPV_CURVE   = 24;
+ EN_PCV_CURVE   = 25;
  
  EN_DURATION     = 0;  { Time parameters }
  EN_HYDSTEP      = 1;
@@ -121,6 +127,7 @@ const
  EN_FCV        = 6;
  EN_TCV        = 7;
  EN_GPV        = 8;
+ EN_PCV        = 9;
  
  EN_CLOSED     = 0;   { Link status types }
  EN_OPEN       = 1;
@@ -154,6 +161,11 @@ const
  EN_MLD        = 7;
  EN_CMH        = 8;
  EN_CMD        = 9;
+ EN_CMS        = 10;
+
+ EN_PSI        = 0;   { Pressure units types }
+ EN_KPA        = 1;
+ EN_METERS     = 2;
 
  EN_DDA        = 0;   { Demand model types }
  EN_PDA        = 1;  
@@ -181,6 +193,10 @@ const
  EN_WALLORDER    = 20;
  EN_TANKORDER    = 21;
  EN_CONCENLIMIT  = 22;
+ EN_DEMANDPATTERN = 23;
+ EN_EMITBACKFLOW  = 24;
+ EN_PRESS_UNITS   = 25;
+ EN_STATUS_REPORT = 26;
 
  EN_LOWLEVEL   = 0;   { Control types }
  EN_HILEVEL    = 1;
@@ -212,7 +228,8 @@ const
  EN_PUMP_CURVE    = 1;
  EN_EFFIC_CURVE   = 2;
  EN_HLOSS_CURVE   = 3;
- EN_GENERIC_CURVE = 4; 
+ EN_GENERIC_CURVE = 4;
+ EN_VALVE_CURVE   = 5; 
  
  EN_UNCONDITIONAL = 0; { Deletion action codes }
  EN_CONDITIONAL   = 1; 
@@ -254,12 +271,21 @@ const
  EN_R_IS_CLOSED = 2;
  EN_R_IS_ACTIVE = 3;
  
- EpanetLib = 'epanet2.dll';
+ EN_FALSE       = 0;   { boolean false }
+ EN_TRUE        = 1;   { boolean true }
+
+
+{$ifdef MSWINDOWS}
+ EpanetLib = 'epanet2.dll'; 
+{$else}
+ EpanetLib = 'libepanet2.so';
+{$endif}
   
 {Project Functions}  
  function  ENepanet(F1: PAnsiChar; F2: PAnsiChar; F3: PAnsiChar; F4: Pointer): Integer; stdcall; external EpanetLib;
  function  ENinit(F2: PAnsiChar; F3: PAnsiChar; UnitsType: Integer; HeadlossType: Integer): Integer; stdcall; external EpanetLib;
  function  ENopen(F1: PAnsiChar; F2: PAnsiChar; F3: PAnsiChar): Integer; stdcall; external EpanetLib;
+ function  ENopenX(F1: PAnsiChar; F2: PAnsiChar; F3: PAnsiChar): Integer; stdcall; external EpanetLib;
  function  ENgetcount(Code: Integer; var Count: Integer): Integer; stdcall; external EpanetLib;
  function  ENgettitle(Line1: PAnsiChar; Line2: PAnsiChar; Line3: PAnsiChar): Integer; stdcall; external EpanetLib;
  function  ENsettitle(Line1: PAnsiChar; Line2: PAnsiChar; Line3: PAnsiChar): Integer; stdcall; external EpanetLib;
@@ -273,8 +299,8 @@ const
  function  ENsaveH: Integer; stdcall; external EpanetLib;
  function  ENopenH: Integer; stdcall; external EpanetLib;
  function  ENinitH(SaveFlag: Integer): Integer; stdcall; external EpanetLib;
- function  ENrunH(var T: LongInt): Integer; stdcall; external EpanetLib;
- function  ENnextH(var Tstep: LongInt): Integer; stdcall; external EpanetLib;
+ function  ENrunH(var T: Integer): Integer; stdcall; external EpanetLib;
+ function  ENnextH(var Tstep: Integer): Integer; stdcall; external EpanetLib;
  function  ENcloseH: Integer; stdcall; external EpanetLib;
  function  ENsavehydfile(F: PAnsiChar): Integer; stdcall; external EpanetLib;
  function  ENusehydfile(F: PAnsiChar): Integer; stdcall; external EpanetLib;
@@ -283,9 +309,9 @@ const
  function  ENsolveQ: Integer; stdcall; external EpanetLib;
  function  ENopenQ: Integer; stdcall; external EpanetLib;
  function  ENinitQ(SaveFlag: Integer): Integer; stdcall; external EpanetLib;
- function  ENrunQ(var T: LongInt): Integer; stdcall; external EpanetLib;
- function  ENnextQ(var Tstep: LongInt): Integer; stdcall; external EpanetLib;
- function  ENstepQ(var Tleft: LongInt): Integer; stdcall; external EpanetLib;
+ function  ENrunQ(var T: Integer): Integer; stdcall; external EpanetLib;
+ function  ENnextQ(var Tstep: Integer): Integer; stdcall; external EpanetLib;
+ function  ENstepQ(var Tleft: Integer): Integer; stdcall; external EpanetLib;
  function  ENcloseQ: Integer; stdcall; external EpanetLib;
 
 {Reporting Functions}
@@ -306,8 +332,8 @@ const
  function  ENsetoption(Code: Integer; Value: Single): Integer; stdcall; external EpanetLib;
  function  ENgetflowunits(var Code: Integer): Integer; stdcall; external EpanetLib;
  function  ENsetflowunits(Code: Integer): Integer; stdcall; external EpanetLib;
- function  ENgettimeparam(Code: Integer; var Value: LongInt): Integer; stdcall; external EpanetLib;
- function  ENsettimeparam(Code: Integer; Value: LongInt): Integer; stdcall; external EpanetLib;
+ function  ENgettimeparam(Code: Integer; var Value: Integer): Integer; stdcall; external EpanetLib;
+ function  ENsettimeparam(Code: Integer; Value: Integer): Integer; stdcall; external EpanetLib;
  function  ENgetqualinfo(var QualType: Integer; ChemName: PAnsiChar; ChemUnits: PAnsiChar; var TraceNode: Integer): Integer; stdcall; external EpanetLib;
  function  ENgetqualtype(var QualCode: Integer; var TraceNode: Integer): Integer; stdcall; external EpanetLib;
  function  ENsetqualtype(QualCode: Integer; ChemName: PAnsiChar; ChemUnits: PAnsiChar; TraceNodeID: PAnsiChar): Integer; stdcall; external EpanetLib;
@@ -356,6 +382,7 @@ const
 
  function  ENgetvertexcount(Index: Integer; var Count: Integer): Integer; stdcall; external EpanetLib;
  function  ENgetvertex(Index: Integer; Vertex: Integer; var X: Double; var Y: Double): Integer; stdcall; external EpanetLib;
+ function  ENsetvertex(Index: Integer; Vertex: Integer; X: Double; Y: Double): Integer; stdcall; external EpanetLib;
  function  ENsetvertices(Index: Integer; var X: Double; var Y: Double; Count: Integer): Integer; stdcall; external EpanetLib;
  
 {Pump Functions}
@@ -383,6 +410,7 @@ const
  function  ENsetcurveid(Index: Integer; ID: PAnsiChar): Integer; stdcall; external EpanetLib;
  function  ENgetcurvelen(Index: Integer; var Len: Integer): Integer; stdcall; external EpanetLib;
  function  ENgetcurvetype(Index: Integer; var CurveType: Integer): Integer; stdcall; external EpanetLib;
+ function  ENsetcurvetype(Index: Integer; CurveType: Integer): Integer; stdcall; external EpanetLib;
  function  ENgetcurvevalue(CurveIndex: Integer; PointIndex: Integer; var X: Single; var Y: Single): Integer; stdcall; external EpanetLib;
  function  ENsetcurvevalue(CurveIndex: Integer; PointIndex: Integer; X: Single; Y: Single): Integer; stdcall; external EpanetLib;
  function  ENgetcurve(Index: Integer; ID: PAnsiChar; var N: Integer; var X: Single; var Y: Single): Integer; stdcall; external EpanetLib;
@@ -393,6 +421,8 @@ const
  function  ENdeletecontrol(Index: Integer): Integer; stdcall; external EpanetLib;
  function  ENgetcontrol(Index: Integer; var Ctype: Integer; var Link: Integer; var Setting: Single; var Node: Integer; var Level: Single): Integer; stdcall; external EpanetLib;
  function  ENsetcontrol(Index: Integer; Ctype: Integer; Link: Integer; Setting: Single; Node: Integer; Level: Single): Integer; stdcall; external EpanetLib;
+ function  ENgetcontrolenabled(Index: Integer; out_enabled: Integer): Integer; stdcall; external EpanetLib;
+ function  ENsetcontrolenabled(Index: Integer; var enabled: Integer): Integer; stdcall; external EpanetLib;
 
  {Rule-Based Control Functions}
  function ENaddrule(Rule: PAnsiChar): Integer; stdcall; external EpanetLib;
@@ -417,6 +447,8 @@ const
           var Status: Integer; var Setting: Single): Integer; stdcall; external EpanetLib;
  function ENsetelseaction(RuleIndex: Integer; ActionIndex: Integer; LinkIndex: Integer;
           Status: Integer; Setting: Single): Integer; stdcall; external EpanetLib;
+ function  ENgetruleenabled(Index: Integer; out_enabled: Integer): Integer; stdcall; external EpanetLib;
+ function  ENsetruleenabled(Index: Integer; var enabled: Integer): Integer; stdcall; external EpanetLib;
 
 implementation
 

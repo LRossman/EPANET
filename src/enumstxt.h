@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 06/20/2019
+ Last Updated: 02/05/2023
  ******************************************************************************
 */
 
@@ -27,7 +27,8 @@ char *LinkTxt[]         = {w_CV,
                            w_PBV,
                            w_FCV,
                            w_TCV,
-                           w_GPV};
+                           w_GPV,
+                           w_PCV};
 
 char *StatTxt[]         = {t_XHEAD,
                            t_TEMPCLOSED,
@@ -58,7 +59,8 @@ char *RptFlowUnitsTxt[] = {u_CFS,
                            u_LPM,
                            u_MLD,
                            u_CMH,
-                           u_CMD};
+                           u_CMD,
+                           u_CMS};
 
 char *FlowUnitsTxt[]    = {w_CFS,
                            w_GPM, 
@@ -69,7 +71,8 @@ char *FlowUnitsTxt[]    = {w_CFS,
                            w_LPM, 
                            w_MLD, 
                            w_CMH,
-                           w_CMD};
+                           w_CMD,
+                           w_CMS};
 
 char *PressUnitsTxt[]   = {w_PSI,
                            w_KPA,
@@ -110,6 +113,10 @@ char *MixTxt[]          = {w_MIXED,
 char *RptFlagTxt[]      = {w_NO,
                            w_YES,
                            w_FULL};
+                           
+char *BackflowTxt[]     = {w_NO,
+                           w_YES,
+                           NULL};
 
 char *SectTxt[]         = {s_TITLE,     s_JUNCTIONS, s_RESERVOIRS,
                            s_TANKS,     s_PIPES,     s_PUMPS,
