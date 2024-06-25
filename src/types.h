@@ -1,13 +1,13 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       types.h
  Description:  symbolic constants and data types used throughout EPANET
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 10/29/2019
+ Last Updated: 07/17/2023
  ******************************************************************************
 */
 
@@ -31,7 +31,7 @@ typedef  int          INT4;
    Various constants
 ----------------------------------------------
 */
-#define   CODEVERSION        20200
+#define   CODEVERSION        20300
 #define   MAGICNUMBER        516114521
 #define   ENGINE_VERSION     201   // Used for binary hydraulics file
 #define   EOFMARK            0x1A  // Use 0x04 for UNIX systems
@@ -48,6 +48,9 @@ typedef  int          INT4;
 #define   BIG       1.E10
 #define   TINY      1.E-6
 #define   MISSING   -1.E10     // Missing value indicator
+#define   SET_CLOSED -1.E10    // Link set closed indicator
+#define   SET_OPEN    1.E10    // Link set open indicator
+
 #define   DIFFUS    1.3E-8     // Diffusivity of chlorine
                                // @ 20 deg C (sq ft/sec)
 #define   VISCOS    1.1E-5     // Kinematic viscosity of water
@@ -71,6 +74,7 @@ typedef  int          INT4;
 #define   IMGDperCFS  0.5382
 #define   LPSperCFS   28.317
 #define   LPMperCFS   1699.0
+#define   CMSperCFS   0.028317
 #define   CMHperCFS   101.94
 #define   CMDperCFS   2446.6
 #define   MLDperCFS   2.4466
@@ -145,7 +149,8 @@ typedef enum {
   PBV,           // pressure breaker valve
   FCV,           // flow control valve
   TCV,           // throttle control valve
-  GPV            // general purpose valve
+  GPV,           // general purpose valve
+  PCV            // positional control valve
 } LinkType;
 
 typedef enum {
@@ -166,7 +171,8 @@ typedef enum {
   PUMP_CURVE,    // pump curve
   EFFIC_CURVE,   // efficiency curve
   HLOSS_CURVE,   // head loss curve
-  GENERIC_CURVE  // generic curve
+  GENERIC_CURVE, // generic curve
+  VALVE_CURVE    // positional valve loss curve
 } CurveType;
 
 typedef enum {
@@ -225,7 +231,8 @@ typedef enum {
   LPM,           // liters per minute
   MLD,           // megaliters per day
   CMH,           // cubic meters per hour
-  CMD            // cubic meters per day
+  CMD,           // cubic meters per day
+  CMS            // cubic meters per second
 } FlowUnitsType;
 
 typedef enum {
@@ -355,6 +362,8 @@ typedef struct             // Energy Usage Object
   double KwHrs;            // total kw-hrs consumed
   double MaxKwatts;        // max. kw consumed
   double TotalCost;        // total pumping cost
+  double CurrentPower;     // current pump power (kw)
+  double CurrentEffic;     // current pump efficiency
 } Senergy;
 
 struct Ssource             // Water Quality Source Object
@@ -428,7 +437,7 @@ typedef struct             // Tank Object
   int     Pat;             // fixed grade time pattern
   int     Vcurve;          // volume v. elev. curve index
   MixType MixModel;        // type of mixing model
-  double  V1max;           // mixing compartment size
+  double  V1frac;          // mixing compartment fraction
   int     CanOverflow;     // tank can overflow or not
 } Stank;
 
@@ -453,6 +462,7 @@ typedef struct             // Pump Object
 typedef struct             // Valve Object
 {
   int Link;                // link index of valve
+  int Curve;               // positional loss coeff. curve
 } Svalve;
 
 typedef struct             // Control Statement
@@ -464,6 +474,7 @@ typedef struct             // Control Statement
     double      Setting;   // new link setting
     StatusType  Status;    // new link status
     ControlType Type;      // control type
+    int         isEnabled; // control enabled?
 } Scontrol;
 
 typedef struct             // Field Object of Report Table
@@ -515,6 +526,7 @@ typedef struct                 // Control Rule Structure
 {
     char     label[MAXID+1];   // rule label
     double   priority;         // priority level
+    int      isEnabled;        // is the rule enabled?
     Spremise *Premises;        // list of premises
     Saction  *ThenActions;     // list of THEN actions
     Saction  *ElseActions;     // list of ELSE actions
@@ -571,8 +583,7 @@ typedef struct {
     ErrTok,                // Index of error-producing token
     Unitsflag,             // Unit system flag
     Flowflag,              // Flow units flag
-    Pressflag,             // Pressure units flag
-    DefPat;                // Default demand pattern
+    Pressflag;             // Pressure units flag
 
   Spattern *PrevPat;       // Previous pattern processed
   Scurve   *PrevCurve;     // Previous curve processed
@@ -628,7 +639,10 @@ typedef struct {
     Rpt2Fname[MAXFNAME+1], // Secondary report file name
     DateStamp[26];         // Current date & time
 
-  SField   Field[MAXVAR];  // Output reporting fields
+    SField   Field[MAXVAR];  // Output reporting fields
+
+    void (*reportCallback)(void*,void*,const char*); // user-supplied reporting callback
+    void *reportCallbackUserData;  // user-supplied reporting context
 
 } Report;
 
@@ -688,7 +702,6 @@ typedef struct {
     *XLNZ,       // Start position of each column in NZSUB
     *NZSUB,      // Row index of each coeff. in each column
     *LNZ,        // Position of each coeff. in Aij array
-    *Degree,     // Number of links adjacent to each node
     *link,       // Array used by linear eqn. solver
     *first;      // Array used by linear eqn. solver
 
@@ -734,9 +747,11 @@ typedef struct {
     *Xflow;                // Inflow - outflow at each node
 
   int
+    DefPat,                // Default demand pattern
     Epat,                  // Energy cost time pattern
     DemandModel,           // Fixed or pressure dependent
     Formflag,              // Head loss formula flag
+    EmitBackFlag,          // Emitter backflow flag
     Iterations,            // Number of hydraulic trials taken
     MaxIter,               // Max. hydraulic trials allowed
     ExtraIter,             // Extra hydraulic trials

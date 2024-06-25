@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 07/15/2019
+ Last Updated: 02/05/2023
  ******************************************************************************
 */
 
@@ -40,6 +40,7 @@
 #define   w_FCV         "FCV"
 #define   w_TCV         "TCV"
 #define   w_GPV         "GPV"
+#define   w_PCV         "PCV"
 
 #define   w_OPEN        "OPEN"
 #define   w_CLOSED      "CLOSED"
@@ -50,9 +51,6 @@
 #define   w_PRECISION   "PREC"
 #define   w_IS          "IS"
 #define   w_NOT         "NOT"
-
-#define   w_ADD         "ADD"
-#define   w_MULTIPLY    "MULT"
 
 #define   w_LIMITING    "LIMIT"
 #define   w_ORDER       "ORDER"
@@ -86,6 +84,7 @@
 #define   w_MLD         "MLD"
 #define   w_CMH         "CMH"
 #define   w_CMD         "CMD"
+#define   w_CMS         "CMS"
 #define   w_SI          "SI"
 
 #define   w_PSI         "PSI"
@@ -130,6 +129,7 @@
 #define   w_SEGMENTS    "SEGM"
 #define   w_TOLERANCE   "TOLER"
 #define   w_EMITTER     "EMIT"
+#define   w_BACKFLOW    "BACK"
 
 #define   w_PRICE       "PRICE"
 #define   w_DMNDCHARGE  "DEMAN"
@@ -234,6 +234,7 @@
 #define   u_IMGD        "Imgd"
 #define   u_LPS         "L/s"
 #define   u_LPM         "Lpm"
+#define   u_CMS         "m3/s"
 #define   u_CMH         "m3/h"
 #define   u_CMD         "m3/d"
 #define   u_MLD         "ML/d"

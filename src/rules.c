@@ -404,7 +404,7 @@ void adjustrules(Project *pr, int objtype, int index)
     }
 }
 
-void adjusttankrules(Project *pr)
+void adjusttankrules(Project *pr, int ndiff)
 //-----------------------------------------------------------
 //    Adjusts tank indices in rule premises.
 //-----------------------------------------------------------
@@ -420,7 +420,8 @@ void adjusttankrules(Project *pr)
         p = net->Rule[i].Premises;
         while (p != NULL)
         {
-            if (p->object == r_NODE && p->index > njuncs) p->index++;
+            if (p->object == r_NODE && p->index > njuncs)
+                p->index += ndiff;
             p = p->next;
         }
     }
@@ -472,7 +473,7 @@ int writerule(Project *pr, FILE *f, int ruleIndex)
     Srule      *rule = &net->Rule[ruleIndex];
     Spremise   *p;
     Saction    *a;
-
+    
     // Write each premise clause to the file
     p = rule->Premises;
     fprintf(f, "\nIF   ");
@@ -527,6 +528,11 @@ int checkrules(Project *pr, long dt)
     rules->ActionList = NULL;
     for (i = 1; i <= net->Nrules; i++)
     {
+        // skip if the rule is disabled
+        if (!net->Rule[i].isEnabled)
+        {
+            continue;
+        }
         // If premises true, add THEN clauses to action list
         if (evalpremises(pr, i) == TRUE)
         {
@@ -549,6 +555,126 @@ int checkrules(Project *pr, long dt)
     return actionCount;
 }
 
+void updateruleunits(Project *pr, double dcf, double pcf, double hcf, double qcf)
+//-----------------------------------------------------------
+//    Updates the units of a rule's premises and actions.
+//-----------------------------------------------------------
+{
+    Network *net = &pr->network;
+    Slink  *Link = net->Link;
+
+    int i, k;
+    double x;
+    Spremise *p;
+    Saction *a;
+    
+    for (i = 1; i <= net->Nrules; i++)
+    {
+        p = net->Rule[i].Premises;
+        while (p != NULL)
+        {
+
+            switch (p->variable)
+            {
+            case r_DEMAND:
+                p->value *= dcf;
+                break;
+
+            case r_HEAD:
+            case r_GRADE:
+                p->value *= hcf;
+                break;
+
+            case r_PRESSURE:
+                p->value *= pcf;
+                break;
+
+            case r_LEVEL:
+                p->value *= hcf;
+                break;
+
+            case r_FLOW:
+                p->value *= qcf;
+                break;
+
+            case r_SETTING:
+
+                switch (Link[p->index].Type)
+                {
+                case PRV:
+                case PSV:
+                case PBV:
+                    p->value *= pcf;
+                    break;
+                case FCV:
+                    p->value *= qcf;
+                    break;
+                default:
+                    break;
+                }
+                break;
+            
+            default:
+                break;
+
+            }
+            p = p->next;
+        }
+
+        a = net->Rule[i].ThenActions;
+        while (a != NULL)
+        {
+            k = a->link;
+            x = a->setting;
+
+            // Change link's setting
+            if (x != MISSING)
+            {
+                switch (net->Link[k].Type)
+                {
+                case PRV:
+                case PSV:
+                case PBV:
+                    a->setting *= pcf;
+                    break;
+                case FCV:
+                    a->setting *= qcf;
+                    break;
+                default:
+                    break;
+                }
+            }
+            a = a->next;
+        }
+        a = net->Rule[i].ElseActions;
+        while (a != NULL)
+        {
+            k = a->link;
+            x = a->setting;
+
+            // Change link's setting
+            if (x != MISSING)
+            {
+                switch (net->Link[k].Type)
+                {
+                case PRV:
+                case PSV:
+                case PBV:
+                    a->setting *= pcf;
+                    break;
+                case FCV:
+                    a->setting *= qcf;
+                    break;
+                default:
+                    break;
+                }
+            }
+            a = a->next;
+        }
+    }
+}
+
+
 void newrule(Project *pr)
 //----------------------------------------------------------
 //    Adds a new rule to the project
@@ -564,6 +690,7 @@ void newrule(Project *pr)
     rule->ThenActions = NULL;
     rule->ElseActions = NULL;
     rule->priority = 0.0;
+    rule->isEnabled = TRUE;
     pr->rules.LastPremise = NULL;
     pr->rules.LastThenAction = NULL;
     pr->rules.LastElseAction = NULL;

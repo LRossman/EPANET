@@ -3,9 +3,13 @@ OWA-EPANET
 
 ## Build Status
 [![Build status](https://ci.appveyor.com/api/projects/status/19wpg4g2cmj3oihl?svg=true)](https://ci.appveyor.com/project/OpenWaterAnalytics/epanet)
-[![Build Status](https://travis-ci.org/OpenWaterAnalytics/EPANET.svg)](https://travis-ci.org/OpenWaterAnalytics/EPANET)
 
 [![codecov](https://codecov.io/gh/OpenWaterAnalytics/EPANET/branch/master/graph/badge.svg)](https://codecov.io/gh/OpenWaterAnalytics/EPANET)
+
+[![linux](https://github.com/OpenWaterAnalytics/EPANET/actions/workflows/ccpp.yml/badge.svg)](https://github.com/OpenWaterAnalytics/EPANET/actions/workflows/ccpp.yml)
+[![macos](https://github.com/OpenWaterAnalytics/EPANET/actions/workflows/macos.yml/badge.svg)](https://github.com/OpenWaterAnalytics/EPANET/actions/workflows/macos.yml)
+[![epanet2-win32](https://github.com/OpenWaterAnalytics/EPANET/actions/workflows/win32.yml/badge.svg)](https://github.com/OpenWaterAnalytics/EPANET/actions/workflows/win32.yml)
+[![epanet2-win64](https://github.com/OpenWaterAnalytics/EPANET/actions/workflows/win64.yml/badge.svg)](https://github.com/OpenWaterAnalytics/EPANET/actions/workflows/win64.yml)
 
 ## DESCRIPTION
 
@@ -30,4 +34,4 @@ The **Open Water Analytics** (OWA) Community is an international group of EPANET
 ## DISCLAIMER
 Although OWA is not formally affiliated with nor endorsed by USEPA, this project has been a collaborative effort between the two that builds upon and extends the USEPA’s legacy EPANET 2.0 code base. For the last "official" release of EPANET please go to the [USEPA website](http://www2.epa.gov/water-research/epanet).
 
-For more general community discussion, FAQ, and roadmapping of the project, please go to the [Community Forum](http://community/wateranalytics.org).
+For more general community discussion, FAQ, and roadmapping of the project, please go to the [Community Forum](http://community.wateranalytics.org).

@@ -7,7 +7,7 @@ Description:  retrieves network data from an EPANET input file
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 07/08/2019
+Last Updated: 09/28/2023
 ******************************************************************************
 */
 
@@ -40,6 +40,8 @@ Last Updated: 07/08/2019
 // Defined in ENUMSTXT.H
 extern char *Fldname[];
 extern char *RptFlowUnitsTxt[];
+extern void reindextanks(Project *pr);
+
 
 int getdata(Project *pr)
 /*
@@ -58,13 +60,18 @@ int getdata(Project *pr)
 
     // Read in network data
     rewind(pr->parser.InFile);
-    ERRCODE(readdata(pr));
-
+    errcode = readdata(pr);
+    
     // Adjust data and convert it to internal units
-    if (!errcode) adjustdata(pr);
-    if (!errcode) initunits(pr);
-    ERRCODE(inittanks(pr));
-    if (!errcode) convertunits(pr);
+    // (error code 200 means there are non-fatal errors in input file)
+    if (errcode == 0 || errcode == 200)
+    {
+        reindextanks(pr);
+        adjustdata(pr);
+        inittanks(pr);
+        initunits(pr);
+        convertunits(pr);
+    }
     return errcode;
 }
 
@@ -97,7 +104,6 @@ void setdefaults(Project *pr)
     parser->Unitsflag = US;     // US unit system
     parser->Flowflag = GPM;     // Flow units are gpm
     parser->Pressflag = PSI;    // Pressure units are psi
-    parser->DefPat = 0;         // Default demand pattern index
     out->Hydflag = SCRATCH;     // No external hydraulics file
     rpt->Tstatflag = SERIES;    // Generate time series output
 
@@ -121,6 +127,8 @@ void setdefaults(Project *pr)
     hyd->Epump = EPUMP;         // Default pump efficiency
     hyd->Emax = 0.0;            // Zero peak energy usage
     hyd->Qexp = 2.0;            // Flow exponent for emitters
+    hyd->EmitBackFlag = 1;      // Allow emitter backflow
+    hyd->DefPat = 0;            // Default demand pattern index
     hyd->Dmult = 1.0;           // Demand multiplier
     hyd->RQtol = RQTOL;         // Default hydraulics parameters
     hyd->CheckFreq = CHECKFREQ;
@@ -212,9 +220,7 @@ void adjustdata(Project *pr)
 
     int i;
     double ucf;     // Unit conversion factor
-    Pdemand demand; // Pointer to demand record
     Slink *link;
-    Snode *node;
     Stank *tank;
 
     // Use 1 hr pattern & report time step if none specified
@@ -228,9 +234,6 @@ void adjustdata(Project *pr)
 
     // Report start time cannot be greater than simulation duration
     if (time->Rstart > time->Dur) time->Rstart = 0;
-
-    // No water quality analysis for single period run
-    if (time->Dur == 0) qual->Qualflag = NONE;
 
     // If no quality timestep, then make it 1/10 of hydraulic timestep
     if (time->Qstep == 0) time->Qstep = time->Hstep / 10;
@@ -258,6 +261,7 @@ void adjustdata(Project *pr)
       case MLD: // megaliters/day
       case CMH: // cubic meters/hr
       case CMD: // cubic meters/day
+      case CMS: // cubic meters/second
         parser->Unitsflag = SI;
         break;
       default:
@@ -322,26 +326,20 @@ void adjustdata(Project *pr)
         if (tank->Kb == MISSING) tank->Kb = qual->Kbulk;
     }
  
-    // Use default pattern if none assigned to a demand
-    parser->DefPat = findpattern(net, parser->DefPatID);
-    if (parser->DefPat > 0) for (i = 1; i <= net->Nnodes; i++)
-    {
-        node = &net->Node[i];
-        for (demand = node->D; demand != NULL; demand = demand->next)
-        {
-            if (demand->Pat == 0) demand->Pat = parser->DefPat;
-        }
-    }
+    // Set default pattern index
+    i = findpattern(net, parser->DefPatID);
+    if (i > 0)
+        hyd->DefPat = i;
 
     // Remove QUALITY as a reporting variable if no WQ analysis
     if (qual->Qualflag == NONE) rpt->Field[QUALITY].Enabled = FALSE;
 }
 
-int inittanks(Project *pr)
+void inittanks(Project *pr)
 /*
 **---------------------------------------------------------------
 **  Input:   none
-**  Output:  returns error code
+**  Output:  none
 **  Purpose: initializes volumes in non-cylindrical tanks
 **---------------------------------------------------------------
 */
@@ -350,7 +348,7 @@ int inittanks(Project *pr)
 
     int i, j, n = 0;
     double a;
-    int errcode = 0, levelerr;
+    int errcode = 0;
     char errmsg[MAXMSG+1] = "";
     Stank *tank;
     Scurve *curve;
@@ -360,47 +358,23 @@ int inittanks(Project *pr)
         tank = &net->Tank[j];
         if (tank->A == 0.0) continue;  // Skip reservoirs
 
-        // Check for valid lower/upper tank levels
-        levelerr = 0;
-        if (tank->H0 > tank->Hmax ||
-            tank->Hmin > tank->Hmax ||
-            tank->H0 < tank->Hmin
-           ) levelerr = 1;
-
-        // Check that tank heights are within volume curve
+        // See if tank has a volume curve
         i = tank->Vcurve;
         if (i > 0)
         {
             curve = &net->Curve[i];
             n = curve->Npts - 1;
-            if (tank->Hmin < curve->X[0] || tank->Hmax > curve->X[n])
-            {
-                levelerr = 1;
-            }
 
-            else
-            {
-                // Find min., max., and initial volumes from curve
-                tank->Vmin = interp(curve->Npts, curve->X, curve->Y, tank->Hmin);
-                tank->Vmax = interp(curve->Npts, curve->X, curve->Y, tank->Hmax);
-                tank->V0 = interp(curve->Npts, curve->X, curve->Y, tank->H0);
+            // Find min., max., and initial volumes from curve
+            tank->Vmin = interp(curve->Npts, curve->X, curve->Y, tank->Hmin);
+            tank->Vmax = interp(curve->Npts, curve->X, curve->Y, tank->Hmax);
+            tank->V0 = interp(curve->Npts, curve->X, curve->Y, tank->H0);
 
-                // Find a "nominal" diameter for tank
-                a = (curve->Y[n] - curve->Y[0]) / (curve->X[n] - curve->X[0]);
-                tank->A = sqrt(4.0 * a / PI);
-            }
-        }
-
-        // Report error in levels if found
-        if (levelerr)
-        {
-            sprintf(pr->Msg, "Error 225: %s node %s", geterrmsg(225, errmsg),
-                    net->Node[tank->Node].ID);
-            writeline(pr, pr->Msg);
-            errcode = 200;
+            // Find a "nominal" diameter for tank
+            a = (curve->Y[n] - curve->Y[0]) / (curve->X[n] - curve->X[0]);
+            tank->A = sqrt(4.0 * a / PI);
         }
     }
-    return errcode;
 }
 
 void initunits(Project *pr)
@@ -446,6 +420,7 @@ void initunits(Project *pr)
         if (parser->Flowflag == MLD) qcf = MLDperCFS;
         if (parser->Flowflag == CMH) qcf = CMHperCFS;
         if (parser->Flowflag == CMD) qcf = CMDperCFS;
+        if (parser->Flowflag == CMS) qcf = CMSperCFS;
 
         hcf = MperFT;
         if (parser->Pressflag == METERS) pcf = MperFT * hyd->SpGrav;
@@ -538,7 +513,6 @@ void convertunits(Project *pr)
     Snode *node;
     Stank *tank;
     Slink *link;
-    Spump *pump;
     Scontrol *control;
 
     // Convert nodal elevations & initial WQ
@@ -588,7 +562,6 @@ void convertunits(Project *pr)
         tank->Kb /= SECperDAY;
         tank->V = tank->V0;
         tank->C = node->C0;
-        tank->V1max *= tank->Vmax;
     }
 
     // Convert hydraulic convergence criteria
@@ -624,29 +597,9 @@ void convertunits(Project *pr)
 
         else if (link->Type == PUMP)
         {
-            // Convert units for pump curve parameters
-            i = findpump(net, k);
-            pump = &net->Pump[i];
-            if (pump->Ptype == CONST_HP)
-            {
-                // For constant hp pump, convert kw to hp
-                if (parser->Unitsflag == SI) pump->R /= pr->Ucf[POWER];
-            }
-            else
-            {
-                // For power curve pumps, convert shutoff head and flow coeff.
-                if (pump->Ptype == POWER_FUNC)
-                {
-                    pump->H0 /= pr->Ucf[HEAD];
-                    pump->R *= (pow(pr->Ucf[FLOW], pump->N) / pr->Ucf[HEAD]);
-                }
-
-                // Convert flow range & max. head units
-                pump->Q0 /= pr->Ucf[FLOW];
-                pump->Qmax /= pr->Ucf[FLOW];
-                pump->Hmax /= pr->Ucf[HEAD];
-            }
+            link->Km /= pr->Ucf[POWER];
         }
+        
         else
         {
             // For flow control valves, convert flow setting

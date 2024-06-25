@@ -45,7 +45,7 @@ static void writeenergy(Project *);
 static int  writeresults(Project *);
 static int  disconnected(Project *);
 static void marknodes(Project *, int, int *, char *);
-static void getclosedlink(Project *, int, char *);
+static void getclosedlink(Project *, int, char *, int *);
 static void writelimits(Project *, int, int);
 static int  checklimits(Report *, double *, int, int);
 static char *fillstr(char *, char, int);
@@ -67,7 +67,7 @@ int clearreport(Project *pr)
     return 0;
 }
 
-int copyreport(Project* pr, char *filename)
+int copyreport(Project* pr, const char *filename)
 /*
 **------------------------------------------------------
 **   Input:   filename = name of file to copy to
@@ -876,7 +876,7 @@ void writeheader(Project *pr, int type, int contin)
     }
 }
 
-void writeline(Project *pr, char *s)
+void writeline(Project *pr, const char *s)
 /*
 **--------------------------------------------------------------
 **   Input:   *s = text string
@@ -886,6 +886,12 @@ void writeline(Project *pr, char *s)
 */
 {
     Report *rpt = &pr->report;
+    
+    if (pr->report.reportCallback != NULL)
+    {
+        pr->report.reportCallback(pr->report.reportCallbackUserData, pr, s);
+        return;
+    }
 
     if (rpt->RptFile == NULL) return;
     if (rpt->Rptflag)
@@ -1281,7 +1287,7 @@ int disconnected(Project *pr)
                     clocktime(rpt->Atime, time->Htime));
             writeline(pr, pr->Msg);
         }
-        getclosedlink(pr, j, marked);
+        getclosedlink(pr, j, marked, nodelist);
     }
 
     // Free allocated memory
@@ -1344,11 +1350,12 @@ void marknodes(Project *pr, int m, int *nodelist, char *marked)
     }
 }
 
-void getclosedlink(Project *pr, int i, char *marked)
+void getclosedlink(Project *pr, int i, char *marked, int *stack)
 /*
 **----------------------------------------------------------------
 **   Input:   i = junction index
 **            marked[] = marks nodes already examined
+**            stack[] = stack to hold nodes to examine
 **   Output:  None.
 **   Purpose: Determines if a closed link connects to junction i.
 **----------------------------------------------------------------
@@ -1359,20 +1366,41 @@ void getclosedlink(Project *pr, int i, char *marked)
     int j, k;
     Padjlist alink;
 
+    int top = 0;
+
+    // Mark the current junction as examined and push onto stack
     marked[i] = 2;
-    for (alink = net->Adjlist[i]; alink != NULL; alink = alink->next)
-    {
-        k = alink->link;
-        j = alink->node;
-        if (marked[j] == 2) continue;
-        if (marked[j] == 1)
-        {
-            sprintf(pr->Msg, WARN03c, net->Link[k].ID);
-            writeline(pr, pr->Msg);
-            return;
+    stack[top] = i;
+
+    while (top >= 0) {
+        i = stack[top--];
+        alink = net->Adjlist[i];
+        
+        // Iterate through each link adjacent to the current node
+        while (alink != NULL) {
+            k = alink->link;
+            j = alink->node;
+
+            // Skip nodes that have already been examined
+            if (marked[j] == 2) {
+                alink = alink->next;
+                continue;
+            }
+
+            // If a closed link is found, return and display a warning message
+            if (marked[j] == 1) {
+                sprintf(pr->Msg, WARN03c, net->Link[k].ID);
+                writeline(pr, pr->Msg);
+                return;
+            }
+
+            // Mark the node as examined and push it onto the stack
+            marked[j] = 2;
+            stack[++top] = j;
+            alink = alink->next;
         }
-        else getclosedlink(pr, j, marked);
     }
+
 }
 
 void writelimits(Project *pr, int j1, int j2)
