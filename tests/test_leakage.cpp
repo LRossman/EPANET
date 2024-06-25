@@ -23,11 +23,11 @@ BOOST_AUTO_TEST_SUITE (test_leakage)
 
 BOOST_AUTO_TEST_CASE(test_leakage_model)
 
-#include <stdio.h>
-#include <math.h>
-#include "epanet2_2.h"
+//#include <stdio.h>
+//#include <math.h>
+//#include "epanet2_2.h"
 
-int main()
+//int main()
 {
     int error = 0;
     int Pipe21, Junc21, Junc22;
