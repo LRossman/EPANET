@@ -87,7 +87,7 @@ BOOST_AUTO_TEST_CASE(test_leakage_model)
     BOOST_REQUIRE(error == 0);
     error = EN_deleteproject(ph);
     BOOST_REQUIRE(error == 0);
-    return 0;
+//    return 0;
 }
 
-////BOOST_AUTO_TEST_SUITE_END()
+BOOST_AUTO_TEST_SUITE_END()
