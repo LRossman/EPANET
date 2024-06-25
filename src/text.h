@@ -1,13 +1,13 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       text.h
  Description:  string constants used throughout EPANET
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 02/05/2023
+ Last Updated: 06/15/2024
  ******************************************************************************
 */
 
@@ -130,6 +130,7 @@
 #define   w_TOLERANCE   "TOLER"
 #define   w_EMITTER     "EMIT"
 #define   w_BACKFLOW    "BACK"
+#define   w_ALLOWED     "ALLOW"
 
 #define   w_PRICE       "PRICE"
 #define   w_DMNDCHARGE  "DEMAN"
@@ -149,6 +150,9 @@
 #define   w_PDA         "PDA"
 #define   w_REQUIRED    "REQ"
 #define   w_EXPONENT    "EXP"
+
+#define   w_AREA        "AREA"
+#define   w_EXPAN       "EXPAN"
 
 #define   w_SECONDS     "SEC"
 #define   w_MINUTES     "MIN"
@@ -207,6 +211,7 @@
 #define   s_DEMANDS     "[DEMANDS]"
 #define   s_SOURCES     "[SOURCES]"
 #define   s_EMITTERS    "[EMITTERS]"
+#define   s_LEAKAGE     "[LEAKAGE]"
 #define   s_PATTERNS    "[PATTERNS]"
 #define   s_CURVES      "[CURVES]"
 #define   s_QUALITY     "[QUALITY]"
