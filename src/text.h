@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 06/15/2024
+ Last Updated: 03/10/2025
  ******************************************************************************
 */
 
@@ -90,6 +90,8 @@
 #define   w_PSI         "PSI"
 #define   w_KPA         "KPA"
 #define   w_METERS      "METERS"
+#define   w_BAR         "BAR"
+#define   w_FEET        "FEET"
 
 #define   w_ELEV        "ELEV"
 #define   w_DEMAND      "DEMAND"
@@ -196,6 +198,7 @@
 #define   w_THEN        "THEN"
 #define   w_ELSE        "ELSE"
 #define   w_PRIORITY    "PRIO"
+#define   w_DISABLED    "DISABLED"
 
 // ------ Input File Section Names ------------------------
 
@@ -269,6 +272,8 @@
 #define   c_PUMP        "PUMP"
 #define   c_EFFIC       "EFFIC"
 #define   c_VOLUME      "VOLUME"
+#define   c_VALVE       "VALVE"
+#define   c_GENERIC     "GENERIC"
 
 //------- Text Phrases ------------------------------------
 
@@ -354,7 +359,7 @@
 #define LOGO4  \
 "*                   Analysis for Pipe Networks                   *"
 #define LOGO5  \
-"*                         Version %d.%d                            *"
+"*                          Version %d.%d.%02d                        *"
 #define LOGO6  \
 "******************************************************************"
 #define FMT02  "\n  o Retrieving network data"

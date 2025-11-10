@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 06/15/2024
+ Last Updated: 09/03/2025
  ******************************************************************************
 */
 
@@ -31,7 +31,7 @@ typedef  int          INT4;
    Various constants
 ----------------------------------------------
 */
-#define   CODEVERSION        20300
+#define   CODEVERSION        20303
 #define   MAGICNUMBER        516114521
 #define   ENGINE_VERSION     201   // Used for binary hydraulics file
 #define   EOFMARK            0x1A  // Use 0x04 for UNIX systems
@@ -83,6 +83,7 @@ typedef  int          INT4;
 #define   MperFT      0.3048
 #define   PSIperFT    0.4333
 #define   KPAperPSI   6.895
+#define   BARperPSI   0.068948
 #define   KWperHP     0.7457
 #define   SECperDAY   86400
 
@@ -238,7 +239,10 @@ typedef enum {
 typedef enum {
   PSI,           // pounds per square inch
   KPA,           // kiloPascals
-  METERS         // meters
+  METERS,        // meters
+  BAR,           // bar
+  FEET,          // feet
+  DEFAULTUNIT    // default based on unit system (SI or US)
 } PressureUnitsType;
 
 typedef enum {
@@ -398,6 +402,7 @@ typedef struct             // Node Object
   int      ResultIndex;    // saved result index
   NodeType Type;           // node type
   char     *Comment;       // node comment
+  char     *Tag;           // optional category tag                                                   
 } Snode;
 
 typedef struct             // Link Object
@@ -407,7 +412,7 @@ typedef struct             // Link Object
   int      N2;             // end node index
   double   Diam;           // diameter
   double   Len;            // length
-  double   Kc;             // roughness
+  double   Kc;             // pipe roughness, pump speed, valve setting
   double   Km;             // minor loss coeff.
   double   Kb;             // bulk react. coeff.
   double   Kw;             // wall react. coef.
@@ -416,11 +421,13 @@ typedef struct             // Link Object
   double   LeakArea;       // leak area (sq mm per 100 pipe length units
   double   LeakExpan;      // leak expansion (sq mm per unit of head)
   LinkType Type;           // link type
-  StatusType Status;       // initial status
+  StatusType InitStatus;   // initial status
+  double     InitSetting;  // initial setting
   Pvertices  Vertices;     // internal vertex coordinates
   int      Rpt;            // reporting flag
   int      ResultIndex;    // saved result index
   char     *Comment;       // link comment
+  char     *Tag;           // optional category tag                                                   
 } Slink;
 
 typedef struct             // Tank Object
@@ -549,6 +556,7 @@ typedef struct                 // Mass Balance Components
     double    reacted;         // mass reacted in system
     double    final;           // final mass in system
     double    ratio;           // ratio of mass added to mass lost
+    int       segCount;        // total number of pipe segments used                       
 } SmassBalance;
 
 typedef struct

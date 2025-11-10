@@ -7,7 +7,7 @@ Description:  saves network data to an EPANET formatted text file
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 06/18/2024
+Last Updated: 04/19/2025
 ******************************************************************************
 */
 
@@ -34,17 +34,17 @@ extern char *TstatTxt[];
 extern char *RptFlagTxt[];
 extern char *SectTxt[];
 extern char *BackflowTxt[];
+extern char *CurveTypeTxt[];
 
 void saveauxdata(Project *pr, FILE *f)
 /*
 ------------------------------------------------------------
-  Writes auxilary data from original input file to new file.
+  Writes auxiliary data from original input file to new file.
 ------------------------------------------------------------
 */
 {
     int sect, newsect;
     char *tok;
-    char write;
     char line[MAXLINE + 1];
     char s[MAXLINE + 1];
     FILE *InFile = pr->parser.InFile;
@@ -79,31 +79,23 @@ void saveauxdata(Project *pr, FILE *f)
                 {
                 case _LABELS:
                 case _BACKDROP:
-                case _TAGS:
                     fprintf(f, "\n%s", line);
                 }
             }
         }
 
-        // Write line of auxilary data to file
+        // Write line of auxiliary data to file
         else
         {
-            write = FALSE;
             switch (sect)
             {
-            case _TAGS:
-                if (*tok == ';' ||
-                    (match("NODE", tok) && findnode(&pr->network, strtok(NULL, SEPSTR))) ||
-                    (match("LINK", tok) && findlink(&pr->network, strtok(NULL, SEPSTR))))
-                    write = TRUE;
-                break;
             case _LABELS:
             case _BACKDROP:
-                write = TRUE; break;
+                 fprintf(f, "%s", line);
+                 break;
             default:
                 break;
             }
-            if (write) fprintf(f, "%s", line);
         }
     }
     fclose(InFile);
@@ -218,7 +210,7 @@ int saveinpfile(Project *pr, const char *fname)
         if (link->Type <= PIPE)
         {
             d = link->Diam;
-            kc = link->Kc;
+            kc = link->InitSetting;
             if (hyd->Formflag == DW)  kc = kc * pr->Ucf[ELEV] * 1000.0;
             km = link->Km * SQR(d) * SQR(d) / 0.02517;
 
@@ -227,7 +219,7 @@ int saveinpfile(Project *pr, const char *fname)
                     link->Len * pr->Ucf[LENGTH], d * pr->Ucf[DIAM], kc, km);
 
             if (link->Type == CVPIPE) sprintf(s2, "CV");
-            else if (link->Status == CLOSED) sprintf(s2, "CLOSED");
+            else if (link->InitStatus == CLOSED) sprintf(s2, "CLOSED");
             else strcpy(s2, " ");
             fprintf(f, "\n%s\t%-6s", s, s2);
             if (link->Comment) fprintf(f, "\t;%s", link->Comment);
@@ -275,9 +267,9 @@ int saveinpfile(Project *pr, const char *fname)
         }
 
         // Optional speed setting
-        if (link->Kc != 1.0)
+        if (link->InitSetting != 1.0)
         {
-            sprintf(s1, "\tSPEED %.4f", link->Kc);
+            sprintf(s1, "\tSPEED %.4f", link->InitSetting);
             strcat(s, s1);
         }
 
@@ -297,8 +289,7 @@ int saveinpfile(Project *pr, const char *fname)
         d = link->Diam;
 
         // Valve setting
-        kc = link->Kc;
-        if (kc == MISSING) kc = 0.0;
+        kc = link->InitSetting;
         switch (link->Type)
         {
           case FCV:
@@ -320,7 +311,7 @@ int saveinpfile(Project *pr, const char *fname)
                 LinkTxt[link->Type]);
 
         // For GPV, setting = head curve index
-        if (link->Type == GPV && (j = ROUND(link->Kc)) > 0)
+        if (link->Type == GPV && (j = ROUND(kc)) > 0)
         {
             sprintf(s1, "%-31s\t%-12.4f", net->Curve[j].ID, km);
         }
@@ -392,7 +383,7 @@ int saveinpfile(Project *pr, const char *fname)
         link = &net->Link[i];
         if (link->Type <= PUMP)
         {
-            if (link->Status == CLOSED)
+            if (link->InitStatus == CLOSED)
             {
                 fprintf(f, "\n %-31s\t%s", link->ID, StatTxt[CLOSED]);
             }
@@ -403,21 +394,21 @@ int saveinpfile(Project *pr, const char *fname)
                 n = findpump(net, i);
                 pump = &net->Pump[n];
                 if (pump->Hcurve == 0 && pump->Ptype != CONST_HP &&
-                    link->Kc != 1.0)
+                    link->InitSetting != 1.0)
                 {
-                    fprintf(f, "\n %-31s\t%-.4f", link->ID, link->Kc);
+                    fprintf(f, "\n %-31s\t%-.4f", link->ID, link->InitSetting);
                 }
             }
         }
 
-        // Write fixed-status PRVs & PSVs (setting = MISSING)
-        else if (link->Kc == MISSING)
+        // Write fixed-status valves 
+        else
         {
-            if (link->Status == OPEN)
+            if (link->InitStatus == OPEN)
             {
                 fprintf(f, "\n %-31s\t%s", link->ID, StatTxt[OPEN]);
             }
-            if (link->Status == CLOSED)
+            if (link->InitStatus == CLOSED)
             {
                 fprintf(f, "\n%-31s\t%s", link->ID, StatTxt[CLOSED]);
             }
@@ -443,15 +434,20 @@ int saveinpfile(Project *pr, const char *fname)
     // Write [CURVES] section
     fprintf(f, "\n\n");
     fprintf(f, s_CURVES);
-    fprintf(f, "\n;;%-31s\t%-12s\t%-12s",
-        "ID", "X-Value", "Y-Value");
+    fprintf(f, "\n;;%-31s\t%-12s\t%-12s", "ID", "X-Value", "Y-Value");
     for (i = 1; i <= net->Ncurves; i++)
     {
-        if (net->Curve[i].Comment) fprintf(f, "\n;%s", net->Curve[i].Comment);
-        for (j = 0; j < net->Curve[i].Npts; j++)
+        curve = &net->Curve[i];
+        if (curve->Comment) fprintf(f, "\n;%s", curve->Comment);
+        if (curve->Npts > 0)
         {
-            curve = &net->Curve[i];
-            fprintf(f, "\n %-31s\t%-12.4f\t%-12.4f", curve->ID, curve->X[j], curve->Y[j]);
+            fprintf(f, "\n %-31s\t%-12.4f\t%-12.4f\t%s", curve->ID,
+                curve->X[0], curve->Y[0], CurveTypeTxt[curve->Type]);
+            for (j = 1; j < curve->Npts; j++)
+            {
+                fprintf(f, "\n %-31s\t%-12.4f\t%-12.4f", curve->ID,
+                    curve->X[j], curve->Y[j]);
+            }
         }
     }
 
@@ -519,7 +515,10 @@ int saveinpfile(Project *pr, const char *fname)
             fprintf(f, "\n%s AT %s %s", s, ControlTxt[TIMEOFDAY],
                     clocktime(rpt->Atime, control->Time));
             break;
+            
+          default: continue;
         }
+        if (control->isEnabled == FALSE) fprintf(f, "  DISABLED");
     }
 
     // Write [RULES] section
@@ -529,6 +528,7 @@ int saveinpfile(Project *pr, const char *fname)
     {
         fprintf(f, "\nRULE %s", pr->network.Rule[i].label);
         writerule(pr, f, i);  // see RULES.C
+        if (pr->network.Rule[i].isEnabled == FALSE) fprintf(f, "\nDISABLED");
         fprintf(f, "\n");
     }
 
@@ -830,7 +830,23 @@ int saveinpfile(Project *pr, const char *fname)
         }
         else fprintf(f, "\n %-20sNO",field->Name);
     }
-
+    
+    // Write [TAGS] section
+    fprintf(f, "\n\n");
+    fprintf(f, s_TAGS);
+    fprintf(f, "\n;;%-8s\t%-31s\t%s", "Object", "ID", "Tag");
+    for (i = 1; i <= net->Nnodes; i++)
+    {
+        node = &net->Node[i];
+        if (node->Tag == NULL || strlen(node->Tag) == 0) continue;
+        fprintf(f, "\n %-8s\t%-31s\t%s", "NODE", node->ID, node->Tag);
+    }
+    for (i = 1; i <= net->Nlinks; i++)
+    {
+        link = &net->Link[i];
+        if (link->Tag == NULL || strlen(link->Tag) == 0) continue;
+        fprintf(f, "\n %-8s\t%-31s\t%s", "LINK", link->ID, link->Tag);
+    }
     // Write [COORDINATES] section
     fprintf(f, "\n\n");
     fprintf(f, s_COORDS);
@@ -857,7 +873,7 @@ int saveinpfile(Project *pr, const char *fname)
         }
     }
 
-    // Save auxilary data to new input file
+    // Save auxiliary data to new input file
     fprintf(f, "\n");
     saveauxdata(pr, f);
 

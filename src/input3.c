@@ -7,7 +7,7 @@ Description:  parses network data from a line of an EPANET input file
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 05/11/2024
+Last Updated: 04/19/2025
 ******************************************************************************
 */
 
@@ -26,6 +26,7 @@ extern char *MixTxt[];
 extern char *Fldname[];
 extern char *DemandModelTxt[];
 extern char *BackflowTxt[];
+extern char *CurveTypeTxt[];
 
 // Imported Functions
 extern int addnodeID(Network *, int, char *);
@@ -390,7 +391,8 @@ int pipedata(Project *pr)
     link->LeakArea = 0.0;
     link->LeakExpan = 0.0;
     link->Type = PIPE;
-    link->Status = OPEN;
+    link->InitStatus = OPEN;
+    link->InitSetting = link->Kc;
     link->Rpt = 0;
     link->ResultIndex = 0;
     link->Comment = xstrcpy(&link->Comment, parser->Comment, MAXMSG);
@@ -419,8 +421,8 @@ int pipedata(Project *pr)
     if (n > 6)
     {
         if (match(parser->Tok[6], w_CV)) link->Type = CVPIPE;
-        else if (match(parser->Tok[6], w_CLOSED)) link->Status = CLOSED;
-        else if (match(parser->Tok[6], w_OPEN))   link->Status = OPEN;
+        else if (match(parser->Tok[6], w_CLOSED)) link->InitStatus = CLOSED;
+        else if (match(parser->Tok[6], w_OPEN))   link->InitStatus = OPEN;
         else
         {
             if (!getfloat(parser->Tok[6], &x) || x < 0.0)
@@ -436,8 +438,8 @@ int pipedata(Project *pr)
             return setError(parser, 6, 202);
         link->Km = x;
         if (match(parser->Tok[7], w_CV))  link->Type = CVPIPE;
-        else if (match(parser->Tok[7], w_CLOSED)) link->Status = CLOSED;
-        else if (match(parser->Tok[7], w_OPEN))   link->Status = OPEN;
+        else if (match(parser->Tok[7], w_CLOSED)) link->InitStatus = CLOSED;
+        else if (match(parser->Tok[7], w_OPEN))   link->InitStatus = OPEN;
         else return setError(parser, 7, 213);
     }
     return 0;
@@ -499,7 +501,8 @@ int pumpdata(Project *pr)
     link->LeakArea = 0.0;
     link->LeakExpan = 0.0;
     link->Type = PUMP;
-    link->Status = OPEN;
+    link->InitStatus = OPEN;
+    link->InitSetting = 1.0;
     link->Rpt = 0;
     link->ResultIndex = 0;
     link->Comment = xstrcpy(&link->Comment, parser->Comment, MAXMSG);
@@ -527,6 +530,7 @@ int pumpdata(Project *pr)
         {
             c = findcurve(net, parser->Tok[m]);
             if (c == 0) return setError(parser, m, 206);
+			pump->Ptype = CUSTOM;
             pump->Hcurve = c;
         }
         else if (match(parser->Tok[m - 1], w_PATTERN))  // Speed/status pattern
@@ -544,6 +548,7 @@ int pumpdata(Project *pr)
         else return setError(parser, m-1, 201);;
         m = m + 2;  // Move to next keyword token
     }
+    link->InitSetting = link->Kc;
     return 0;
 }
 
@@ -620,7 +625,8 @@ int valvedata(Project *pr)
     link->LeakArea = 0.0;
     link->LeakExpan = 0.0;
     link->Type = type;
-    link->Status = ACTIVE;
+    link->InitStatus = ACTIVE;
+    link->InitSetting = 0.0;
     link->Rpt = 0;
     link->ResultIndex = 0;
     link->Comment = xstrcpy(&link->Comment, parser->Comment, MAXMSG);
@@ -640,7 +646,7 @@ int valvedata(Project *pr)
             if (c == 0) return setError(parser, 5, 206);
             link->Kc = c;
             net->Curve[c].Type = HLOSS_CURVE;
-            link->Status = OPEN;
+            link->InitStatus = OPEN;
         }
         else
         {
@@ -662,7 +668,8 @@ int valvedata(Project *pr)
         net->Valve[net->Nvalves].Curve = c;
         net->Curve[c].Type = VALVE_CURVE;
         if (link->Kc > 100.0) link->Kc = 100.0;
-    }        
+    }
+    link->InitSetting = link->Kc;
     return 0;
 }
 
@@ -740,7 +747,7 @@ int curvedata(Project *pr)
     Network *net = &pr->network;
     Parser  *parser = &pr->parser;
 
-    int i;
+    int i, ctype;
     double x, y;
     Scurve *curve;
 
@@ -748,6 +755,11 @@ int curvedata(Project *pr)
     if (parser->Ntokens < 3) return 201;
     if (!getfloat(parser->Tok[1], &x)) return setError(parser, 1, 202);
     if (!getfloat(parser->Tok[2], &y)) return setError(parser, 2, 202);
+    ctype = -1;
+    if (parser->Ntokens > 3)
+    {
+        ctype = findmatch(parser->Tok[3], CurveTypeTxt);
+    }        
 
     // Check if previous input line was for the same curve
     if (parser->PrevCurve && strcmp(parser->Tok[0], parser->PrevCurve->ID) == 0)
@@ -777,6 +789,7 @@ int curvedata(Project *pr)
     curve->X[curve->Npts] = x;
     curve->Y[curve->Npts] = y;
     curve->Npts++;
+    if (ctype >= 0) curve->Type = (CurveType)ctype;
 
     // Save a reference to this curve for processing additional curve data
     parser->PrevCurve = curve;
@@ -920,10 +933,10 @@ int controldata(Project *pr)
 **  Purpose: processes simple controls
 **  Formats:
 **  [CONTROLS]
-**  LINK  linkID  setting IF NODE      nodeID {BELOW/ABOVE}  level
-**  LINK  linkID  setting AT TIME      value  (units)
-**  LINK  linkID  setting AT CLOCKTIME value  (units)
-**   (0)   (1)      (2)   (3) (4)       (5)     (6)          (7)
+**  LINK  linkID  setting IF NODE      nodeID {BELOW/ABOVE}  level (DISABLED)
+**  LINK  linkID  setting AT TIME      value  (units)  (DISABLED)
+**  LINK  linkID  setting AT CLOCKTIME value  (units)  (DISABLED)
+**   (0)   (1)      (2)   (3) (4)       (5)     (6)          (7)  (8)
 **--------------------------------------------------------------
 */
 {
@@ -932,7 +945,8 @@ int controldata(Project *pr)
 
     int          i = 0,                // Node index
                  k,                    // Link index
-                 n;                    // # data items
+                 n,                    // # data items
+                 isEnabled = TRUE;     // Control enabled
     double       setting = MISSING,    // Link setting
                  time = 0.0,           // Simulation time
                  level = 0.0;          // Pressure or tank level
@@ -944,6 +958,13 @@ int controldata(Project *pr)
     // Check for sufficient number of input tokens
     n = parser->Ntokens;
     if (n < 6) return 201;
+    
+    // Check if last token is "DISABLED"
+    if (match(parser->Tok[n-1], w_DISABLED))
+    {
+        isEnabled = FALSE;
+        n = n - 1;
+    }
 
     // Check that controlled link exists
     k = findlink(net, parser->Tok[1]);
@@ -1020,7 +1041,7 @@ int controldata(Project *pr)
     control->Time = (long)(3600.0 * time);
     if (ctltype == TIMEOFDAY) control->Time %= SECperDAY;
     control->Grade = level;
-    control->isEnabled = TRUE;
+    control->isEnabled = isEnabled;
     return 0;
 }
 
@@ -1863,8 +1884,8 @@ int optionchoice(Project *pr, int n)
 **           those listed below, or -1 otherwise
 **  Purpose: processes fixed choice [OPTIONS] data
 **  Formats:
-**    UNITS               CFS/GPM/MGD/IMGD/AFD/LPS/LPM/MLD/CMH/CMD/CMS/SI
-**    PRESSURE            PSI/KPA/M
+**    UNITS               CFS/GPM/MGD/IMGD/AFD/LPS/LPM/MLD/CMH/CMD/CMS
+**    PRESSURE            PSI/KPA/METERS/BAR/FEET
 **    HEADLOSS            H-W/D-W/C-M
 **    HYDRAULICS          USE/SAVE  filename
 **    QUALITY             NONE/AGE/TRACE/CHEMICAL  (TraceNode)
@@ -1905,6 +1926,8 @@ int optionchoice(Project *pr, int n)
         else if (match(parser->Tok[1], w_PSI))    parser->Pressflag = PSI;
         else if (match(parser->Tok[1], w_KPA))    parser->Pressflag = KPA;
         else if (match(parser->Tok[1], w_METERS)) parser->Pressflag = METERS;
+        else if (match(parser->Tok[1], w_BAR))    parser->Pressflag = BAR;
+        else if (match(parser->Tok[1], w_FEET))   parser->Pressflag = FEET;
         else return setError(parser, 1, 213);
     }
 
@@ -2015,7 +2038,7 @@ int optionchoice(Project *pr, int n)
 int optionvalue(Project *pr, int n)
 /*
 **-------------------------------------------------------------
-**  Input:   *line = line read from input file
+**  Input:   n = index of last input token
 **  Output:  returns error code
 **  Purpose: processes numerical value [OPTIONS] data
 **  Formats:
@@ -2162,7 +2185,43 @@ int optionvalue(Project *pr, int n)
     return 0;
 }
 
+int  tagdata(Project *pr)
+/*
+**-------------------------------------------------------------
+**  Input:   none
+**  Output:  returns error code
+**  Purpose: processes [TAGS] data
+**  Formats:
+**    NODE  id  tag
+**    LINK  id  tag
+**--------------------------------------------------------------
+*/
+{
+    Network *net = &pr->network;
+    Parser  *parser = &pr->parser;
 
+    int j, n;
+
+    // Check for sufficient data
+    n = parser->Ntokens;
+    if (n < 3) return 201;
+
+    // First keyword is NODE
+    if (match(parser->Tok[0], w_NODE))
+    {
+        if ((j = findnode(net, parser->Tok[1])) == 0) return setError(parser, 0, 203);
+        xstrcpy(&net->Node[j].Tag, parser->Tok[2], MAXMSG);
+    }
+
+    // First keyword is LINK
+    else if (match(parser->Tok[0], w_LINK))
+    {
+        if ((j = findlink(net, parser->Tok[1])) == 0) return setError(parser, 0, 203);
+        xstrcpy(&net->Link[j].Tag, parser->Tok[2], MAXMSG);
+    } 
+    return 0;   
+}
+    
 void changestatus(Network *net, int j, StatusType status, double y)
 /*
 **--------------------------------------------------------------
@@ -2171,11 +2230,10 @@ void changestatus(Network *net, int j, StatusType status, double y)
 **           y      = numerical setting (pump speed, valve
 **                    setting)
 **  Output:  none
-**  Purpose: changes status or setting of a link
+**  Purpose: changes initial status or setting of a link
 **
 **  NOTE: If status = ACTIVE, then a numerical setting (y) was
-**        supplied. If status = OPEN/CLOSED, then numerical
-**        setting is 0.
+**        supplied.
 **--------------------------------------------------------------
 */
 {
@@ -2183,7 +2241,7 @@ void changestatus(Network *net, int j, StatusType status, double y)
 
     if (link->Type == PIPE || link->Type == GPV)
     {
-        if (status != ACTIVE) link->Status = status;
+        if (status != ACTIVE) link->InitStatus = status;
     }
     else if (link->Type == PUMP)
     {
@@ -2195,12 +2253,13 @@ void changestatus(Network *net, int j, StatusType status, double y)
         }
         else if (status == OPEN) link->Kc = 1.0;
         else if (status == CLOSED) link->Kc = 0.0;
-        link->Status = status;
+        link->InitStatus = status;
+        link->InitSetting = link->Kc;
     }
     else if (link->Type >= PRV)
     {
-        link->Kc = y;
-        link->Status = status;
-        if (status != ACTIVE) link->Kc = MISSING;
+        if (status == ACTIVE) link->Kc = y;
+        link->InitStatus = status;
+        link->InitSetting = link->Kc;
     }
 }

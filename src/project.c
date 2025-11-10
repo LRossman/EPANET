@@ -1,13 +1,13 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       project.c
  Description:  project data management routines
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 06/24/2024
+ Last Updated: 04/23/2025
  ******************************************************************************
 */
 
@@ -168,10 +168,9 @@ int openhydfile(Project *pr)
     INT4 version;
     int errcode = 0;
 
-    // If HydFile currently open, then close it if its not a scratch file
+    // If HydFile currently open, then close it
     if (pr->outfile.HydFile != NULL)
     {
-        if (pr->outfile.Hydflag == SCRATCH) return 0;
         fclose(pr->outfile.HydFile);
         pr->outfile.HydFile = NULL;
     }
@@ -449,11 +448,13 @@ int allocdata(Project *pr)
             pr->network.Node[n].D = NULL;    // node demand
             pr->network.Node[n].S = NULL;    // node source
             pr->network.Node[n].Comment = NULL;
+            pr->network.Node[n].Tag = NULL;                                           
         }
         for (n = 0; n <= pr->parser.MaxLinks; n++)
         {
             pr->network.Link[n].Vertices = NULL;
             pr->network.Link[n].Comment = NULL;
+            pr->network.Link[n].Tag = NULL;                                           
         }
     }
 
@@ -496,6 +497,7 @@ void freedata(Project *pr)
             freedemands(&(pr->network.Node[j]));
             free(pr->network.Node[j].S);
             free(pr->network.Node[j].Comment);
+            free(pr->network.Node[j].Tag);                                          
         }
         free(pr->network.Node);
     }
@@ -507,6 +509,7 @@ void freedata(Project *pr)
         {
             freelinkvertices(&pr->network.Link[j]);
             free(pr->network.Link[j].Comment);
+            free(pr->network.Link[j].Tag);                                          
         }
     }
     free(pr->network.Link);
@@ -751,7 +754,6 @@ int  buildadjlists(Network *net)
     return errcode;
 }
 
-
 void  freeadjlists(Network *net)
 /*
 **--------------------------------------------------------------
@@ -838,6 +840,66 @@ int incontrols(Project *pr, int objType, int index)
     return 0;
 }
 
+int changevalvetype(Project *pr, int index, int type)
+/*
+**--------------------------------------------------------------
+**  Input:   index = link index
+**           type = new valve type
+**  Output:  returns an error code
+**  Purpose: changes a valve's type
+**--------------------------------------------------------------
+*/
+{
+    Network *net = &pr->network;
+    Slink *link;
+    int errcode;
+    double setting;
+
+    // Check that new valve type has legal connections
+    link = &net->Link[index];
+    if (link->Type <= PUMP) return 264;
+    errcode = valvecheck(pr, index, type, link->N1, link->N2);
+    if (errcode) return errcode;
+    
+    // Preserve new type's setting in solver units
+    setting = link->InitSetting;
+    switch (link->Type)
+    {
+        case FCV:
+            setting *= pr->Ucf[FLOW];
+            break;
+        case PRV:
+        case PSV:
+        case PBV:
+            setting *= pr->Ucf[PRESSURE];
+            break;
+        case GPV:
+            setting = 0.0;
+            break;
+    }
+    switch (type)
+    {
+        case FCV:
+            setting /= pr->Ucf[FLOW];
+            break;
+        case PRV:
+        case PSV:
+        case PBV:
+            setting /= pr->Ucf[PRESSURE];
+            break;
+    }
+    
+    // Save setting
+    if (type == GPV) setting = 0.0;
+    if (type == PCV) setting = MIN(setting, 100.0);
+    link->Kc = setting;
+    link->InitSetting = setting;
+    
+    // Change valve link's type
+    link->Type = type;    
+    return 0;
+}
+    
 int valvecheck(Project *pr, int index, int type, int j1, int j2)
 /*
 **--------------------------------------------------------------
@@ -1356,6 +1418,67 @@ int setcomment(Network *network, int object, int index, const char *newcomment)
         if (index < 1 || index > network->Ncurves) return 251;
         comment = network->Curve[index].Comment;
         network->Curve[index].Comment = xstrcpy(&comment, newcomment, MAXMSG);
+        return 0;
+
+    default: return 251;
+    }
+}
+
+int  gettag(Network *network, int object, int index, char *tag)
+//----------------------------------------------------------------
+//  Input:   object = a type of network object
+//           index = index of the specified object
+//           tag = the object's tag string
+//  Output:  error code
+//  Purpose: gets the tag string assigned to an object.
+//----------------------------------------------------------------
+{
+    char *currenttag;
+
+    // Get pointer to specified object's tag
+    switch (object)
+    {
+    case NODE:
+        if (index < 1 || index > network->Nnodes) return 251;
+        currenttag = network->Node[index].Tag;
+        break;
+    case LINK:
+        if (index < 1 || index > network->Nlinks) return 251;
+        currenttag = network->Link[index].Tag;
+        break;
+    default:
+        strcpy(tag, "");
+        return 251;
+    }
+    // Copy the object's tag to the returned string
+    if (currenttag) strcpy(tag, currenttag);
+    else tag[0] = '\0';
+    return 0;
+}
+    
+int settag(Network *network, int object, int index, const char *newtag)
+//----------------------------------------------------------------
+//  Input:   object = a type of network object
+//           index = index of the specified object
+//           newtag = new tag string
+//  Output:  error code
+//  Purpose: sets the tag string of an object.
+//----------------------------------------------------------------
+{
+    char *tag;
+
+    switch (object)
+    {
+    case NODE:
+        if (index < 1 || index > network->Nnodes) return 251;
+        tag = network->Node[index].Tag;
+        network->Node[index].Tag = xstrcpy(&tag, newtag, MAXMSG);
+        return 0;
+
+    case LINK:
+        if (index < 1 || index > network->Nlinks) return 251;
+        tag = network->Link[index].Tag;
+        network->Link[index].Tag = xstrcpy(&tag, newtag, MAXMSG);
         return 0;
 
     default: return 251;

@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 //epanet2.cs[By Oscar Vegas]
-//Last updated on 06/23/2024
+//Last updated on 04/23/2025
 
 //Declarations of functions in the EPANET PROGRAMMERs TOOLKIT
 //(EPANET2.DLL) for use with C#
@@ -84,6 +84,7 @@ namespace EpanetCSharpLibrary
         public const int EN_LEAK_AREA = 26;
         public const int EN_LEAK_EXPAN = 27;
         public const int EN_LINK_LEAKAGE = 28;
+        public const int EN_VALVE_TYPE = 29;
 
         public const int EN_DURATION = 0;      //Time parameters
         public const int EN_HYDSTEP = 1;
@@ -169,6 +170,8 @@ namespace EpanetCSharpLibrary
         public const int EN_PSI = 0;           //Pressure units types
         public const int EN_KPA = 1;
         public const int EN_METERS = 2;
+        public const int EN_BAR = 3;
+        public const int EN_FEET = 4;
 
         public const int EN_DDA = 0;           //Demand driven analysis
         public const int EN_PDA = 1;           //Pressure driven analysis
@@ -303,7 +306,18 @@ namespace EpanetCSharpLibrary
 
         [DllImport(EPANETDLL, EntryPoint = "ENsettitle")]
         public static extern int ENsettitle(string titleline1, string titleline2, string titleline3);
+        
+        [DllImport(EPANETDLL, EntryPoint = "ENgetcomment")]
+        public static extern int ENgetcomment(int type, int index, string comment); 
 
+        [DllImport(EPANETDLL, EntryPoint = "ENsetcomment")]
+        public static extern int ENsetcomment(int type, int index, string comment); 
+
+        [DllImport(EPANETDLL, EntryPoint = "ENgettag")]
+        public static extern int ENgettag(int type, int index, string tag); 
+
+        [DllImport(EPANETDLL, EntryPoint = "ENsettag")]
+        public static extern int ENsettag(int type, int index, string tag); 
         [DllImport(EPANETDLL, EntryPoint = "ENsaveinpfile")]
         public static extern int ENsaveinpfile(string filename);
 
@@ -600,6 +614,9 @@ namespace EpanetCSharpLibrary
         [DllImport(EPANETDLL, EntryPoint = "ENsetpattern")]
         public static extern int ENsetpattern(int index, ref float[] values, int len);
 
+        [DllImport(EPANETDLL, EntryPoint = "ENloadpatternfile")]
+        public static extern int ENdeletepattern(string filename, string id);
+
 
         //Data Curve Functions
         [DllImport(EPANETDLL, EntryPoint = "ENaddcurve")]
@@ -650,7 +667,7 @@ namespace EpanetCSharpLibrary
         public static extern int ENsetcontrol(int index, int type, int linkIndex, float setting, int nodeIndex, float level);
 
         [DllImport(EPANETDLL, EntryPoint = "ENgetcontrolenabled")]
-        public static extern int ENgetcontrolenabled(int index, int out_enabled);
+        public static extern int ENgetcontrolenabled(int index, ref int out_enabled);
 
         [DllImport(EPANETDLL, EntryPoint = "ENsetcontrolenabled")]
         public static extern int ENsetcontrolenabled(int index, int enabled);
@@ -700,7 +717,7 @@ namespace EpanetCSharpLibrary
         public static extern int ENsetelseaction(int ruleIndex, int actionIndex, int linkIndex, int status, float setting);
 
         [DllImport(EPANETDLL, EntryPoint = "ENgetruleenabled")]
-        public static extern int ENgetruleenabled(int index, int out_enabled);
+        public static extern int ENgetruleenabled(int index, ref int out_enabled);
 
         [DllImport(EPANETDLL, EntryPoint = "ENsetruleenabled")]
         public static extern int ENsetruleenabled(int index, int enabled);

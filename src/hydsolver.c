@@ -1,7 +1,7 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       hydsolver.c
  Description:  computes flows and pressures throughout a pipe network using
                Todini's Global Gradient Algorithm
@@ -178,7 +178,7 @@ int  hydsolve(Project *pr, int *iter, double *relerr)
             nextcheck = *iter + hyd->CheckFreq;
         }
 
-        // No convergence yet - see if its time for a periodic status
+        // No convergence yet - see if it's time for a periodic status
         // check  on pumps, CV's, and pipes connected to tank
         else if (*iter <= hyd->MaxCheck && *iter == nextcheck)
         {
@@ -702,7 +702,7 @@ int pdaconverged(Project *pr)
 {
     Hydraul *hyd = &pr->hydraul;
 
-    const double QTOL = 0.0001;  // 0.0001 cfs ~= 0.005 gpm ~= 0.2 lpm)
+    const double QTOL = 0.0001;  // 0.0001 cfs ~= 0.05 gpm ~= 0.2 lpm)
     int i, converged = 1;
 
     double totalDemand = 0.0, totalReduction = 0.0;

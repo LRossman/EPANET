@@ -1,13 +1,13 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       epanet2.h
  Description:  declarations of the legacy style EPANET 2 API functions
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 09/28/2023
+ Last Updated: 02/14/2025
  ******************************************************************************
  */
 
@@ -18,7 +18,7 @@ set of thread safe API functions that allows one to run concurrent analyses on
 multiple EPANET projects can be found in the epanet2_2.h header file. The two
 APIs share the same function names and arguments with the difference being that
 the thread safe functions use the prefix "EN_" and include an extra argument that
-represents the EPANET project being analyzed. To avoid unneccesary repetition,
+represents the EPANET project being analyzed. To avoid unnecessary repetition,
 only the thread safe API functions have been documented. To see a description of
 a legacy style API function declared here please refer to its complementary named
 function in epanet2_2.h.
@@ -83,6 +83,10 @@ extern "C" {
   int  DLLEXPORT ENgetcomment(int object, int index, char *comment);
 
   int  DLLEXPORT ENsetcomment(int object, int index, const char *comment);
+
+  int  DLLEXPORT ENgettag(int object, int index, char *tag);
+
+  int  DLLEXPORT ENsettag(int object, int index, const char *tag);
 
   int  DLLEXPORT ENgetcount(int object, int *count);
 
@@ -165,6 +169,7 @@ extern "C" {
   int  DLLEXPORT ENtimetonextevent(int *eventType, long *duration, int *elementIndex);
 
   int DLLEXPORT ENsetreportcallback(void (*callback)(void *userData, void *EN_projectHandle, const char*));
+  
   int DLLEXPORT ENsetreportcallbackuserdata(void *userData);
 
 
@@ -346,6 +351,8 @@ extern "C" {
   int DLLEXPORT ENgetaveragepatternvalue(int index, EN_API_FLOAT_TYPE *value);
 
   int DLLEXPORT ENsetpattern(int index, EN_API_FLOAT_TYPE *values, int len);
+
+  int DLLEXPORT ENloadpatternfile(const char *filename, const char *id);
 
 /********************************************************************
 

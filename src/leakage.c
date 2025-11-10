@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 06/14/2024
+ Last Updated: 09/10/2025
  ******************************************************************************
 */
 /*
@@ -141,7 +141,7 @@ void convert_pipe_to_node_leakage(Project *pr)
 **   Input:   none
 **   Output:  none
 **   Purpose: converts pipe leakage parameters into node leakage
-**            coefficents.
+**            coefficients.
 **-------------------------------------------------------------
 */
 {
@@ -307,10 +307,10 @@ double findlinkleakage(Project *pr, int i)
         hsqrt = sqrt(h2);    
         q2 = c * (a + m * h2) * hsqrt;
     }
-    
+
     // Adjust leakage flows to account for one node being fixed grade
-    if (q2 == 0.0) q1 *= 2.0;
-    if (q1 == 0.0) q2 *= 2.0;
+    if (n2 > net->Njuncs) q1 *= 2.0;
+    if (n1 > net->Njuncs) q2 *= 2.0;
     return q1 + q2;
 }    
 
@@ -432,15 +432,18 @@ int leakagehasconverged(Project *pr)
         
         // Directly compute a reference leakage at this pressure head
         qref = 0.0;
-        // Contribution from pipes with fixed area leaks
-        if (hyd->Leakage[i].cfa > 0.0)
-            qref = sqrt(h / hyd->Leakage[i].cfa);
-        // Contribution from pipes with variable area leaks
-        if (hyd->Leakage[i].cva > 0.0)
-            qref += pow((h / hyd->Leakage[i].cva), 1.5);
+        if ( h > 0.0)
+        {
+            // Contribution from pipes with fixed area leaks
+            if (hyd->Leakage[i].cfa > 0.0)
+                qref = sqrt(h / hyd->Leakage[i].cfa);
+            // Contribution from pipes with variable area leaks
+            if (hyd->Leakage[i].cva > 0.0)
+                qref += pow((h / hyd->Leakage[i].cva), 1.5);
+        }
         
         // Compare reference leakage to solution leakage
-        qtest = hyd->Leakage[i].qfa + hyd->Leakage[i].qva;
+        qtest = hyd->Leakage[i].qfa + hyd->Leakage[i].qva;        
         if (fabs(qref - qtest) > QTOL) return FALSE;
     }
     return TRUE;

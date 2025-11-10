@@ -1,13 +1,13 @@
 /*
 ******************************************************************************
 Project:      OWA EPANET
-Version:      2.2
+Version:      2.3
 Module:       qualreact.c
 Description:  computes water quality reactions within pipes and tanks
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 03/12/2024
+Last Updated: 12/16/2024
 ******************************************************************************
 */
 
@@ -232,7 +232,7 @@ double piperate(Project *pr, int k)
     }
 
     // Compute Reynolds No.
-    // Flow rate made consistent with how its saved to hydraulics file
+    // Flow rate made consistent with how it's saved to hydraulics file
     q = (hyd->LinkStatus[k] <= CLOSED) ? 0.0 : hyd->LinkFlow[k];
     a = PI * d * d / 4.0;         // pipe area
     u = fabs(q) / a;              // flow velocity
@@ -566,10 +566,10 @@ void tankmix2(Project *pr, int i, double vin, double win, double vnet)
     // Update segment volumes
     if (vt > 0.0)
     {
-        mixzone->v = vmz;
         if (vnet > 0.0)
         {
-            stagzone->v += vt;
+           mixzone->v = vmz;
+           stagzone->v += vt;
             
             // Account for mass lost in overflow from stagnant zone
             vsz = (tank->Vmax) - vmz;
@@ -579,14 +579,18 @@ void tankmix2(Project *pr, int i, double vin, double win, double vnet)
                 stagzone->v = vsz;
             }
         }
-        else stagzone->v = MAX(0.0, ((stagzone->v) - vt));
+        else
+        {
+            stagzone->v = MAX(0.0, ((stagzone->v) - vt));
+            mixzone->v = vmz + vt + vnet;
+        }
     }
     else
     {
         mixzone->v += vnet;
         mixzone->v = MIN(mixzone->v, vmz);
         mixzone->v = MAX(0.0, mixzone->v);
-        stagzone->v = 0.0;
+        if (vmz - mixzone->v > 0.0) stagzone->v = 0.0;
     }
 
     // Use quality of mixing zone to represent quality of
@@ -768,7 +772,7 @@ void tankmix4(Project *pr, int i, double vin, double win, double vnet)
             vsum += vseg;
             wsum += (seg->c) * vseg;
 
-            // ... update remiaing volume to remove
+            // ... update remaining volume to remove
             vnet -= vseg;
 
             // ... if no more volume left in current segment

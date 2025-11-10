@@ -1,13 +1,13 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       report.c
  Description:  procedures for writing formatted text to a report file
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 07/22/2019
+ Last Updated: 02/14/2025
  ******************************************************************************
 */
 
@@ -191,6 +191,7 @@ void writelogo(Project *pr)
     int version;
     int major;
     int minor;
+    int patch;
     char s[80];
     time_t timer; // time_t structure & functions time() &
                   // ctime() are defined in time.h
@@ -198,6 +199,7 @@ void writelogo(Project *pr)
     version = CODEVERSION;
     major = version / 10000;
     minor = (version % 10000) / 100;
+    patch = version % 100;
 
     time(&timer);
     strcpy(rpt->DateStamp, ctime(&timer));
@@ -209,7 +211,7 @@ void writelogo(Project *pr)
     writeline(pr, LOGO2);
     writeline(pr, LOGO3);
     writeline(pr, LOGO4);
-    sprintf(s, LOGO5, major, minor);
+    sprintf(s, LOGO5, major, minor, patch);
     writeline(pr, s);
     writeline(pr, LOGO6);
     writeline(pr, "");
@@ -466,7 +468,7 @@ void writemassbalance(Project *pr)
 **   Input:   none
 **   Output:  none
 **   Purpose: writes water quality mass balance ratio
-**            (Outflow + Final Storage) / Inflow + Initial Storage)
+**            (Outflow + Final Storage) / Inflow + Initial Storage
 **            to report file.
 **-------------------------------------------------------------
 */
@@ -501,6 +503,8 @@ void writemassbalance(Project *pr)
     writeline(pr, s1);
     snprintf(s1, MAXMSG, "Mass Ratio:         %-.5f", qual->MassBalance.ratio);
     writeline(pr, s1);
+    snprintf(s1, MAXMSG, "Total Segments:     %d", qual->MassBalance.segCount);
+    writeline(pr, s1);                          
     snprintf(s1, MAXMSG, "================================\n");
     writeline(pr, s1);
 }

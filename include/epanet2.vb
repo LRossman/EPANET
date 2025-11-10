@@ -4,7 +4,7 @@
 'Declarations of functions in the EPANET PROGRAMMERs TOOLKIT
 '(EPANET2.DLL) for use with VB.Net.
 
-'Last updated on 06/23/2024
+'Last updated on 04/23/2025
 
 Imports System.Runtime.InteropServices
 Imports System.Text
@@ -75,6 +75,7 @@ Public Const EN_PCV_CURVE = 25
 Public Const EN_LEAK_AREA = 26
 Public Const EN_LEAK_EXPAN = 27
 Public Const EN_LINK_LEAKAGE = 28
+Public Const EN_VALVE_TYPE = 29
 
 Public Const EN_DURATION = 0      ' Time parameters
 Public Const EN_HYDSTEP = 1
@@ -160,6 +161,8 @@ Public Const EN_CMS = 10
 Public Const EN_PSI = 0           ' Pressure units types
 Public Const EN_KPA = 1
 Public Const EN_METERS = 2
+Public Const EN_BAR = 3
+Public Const EN_FEET = 4
 
 Public Const EN_DDA = 0           ' Demand driven analysis
 Public Const EN_PDA = 1           ' Pressure driven analysis
@@ -281,6 +284,10 @@ Public Const EN_TRUE  = 1   ' boolean true
  Declare Function ENopenX Lib "epanet2.dll" (ByVal inpFile As String, ByVal rptFile As String, ByVal outFile As String) As Int32
  Declare Function ENgettitle Lib "epanet2.dll" (ByVal titleline1 As String, ByVal titleline2 As String, ByVal titleline3 As String) As Int32
  Declare Function ENsettitle Lib "epanet2.dll" (ByVal titleline1 As String, ByVal titleline2 As String, ByVal titleline3 As String) As Int32
+ Declare Function ENgetcomment Lib "epanet2.dll" (ByVal type_ As Int32, ByVal index As Int32, ByVal comment As String) As Int32
+ Declare Function ENsetcomment Lib "epanet2.dll" (ByVal type_ As Int32, ByVal index As Int32, ByVal comment As String) As Int32
+ Declare Function ENgettag Lib "epanet2.dll" (ByVal type_ As Int32, ByVal index As Int32, ByVal tag As String) As Int32
+ Declare Function ENsettag Lib "epanet2.dll" (ByVal type_ As Int32, ByVal index As Int32, ByVal tag As String) As Int32
  Declare Function ENsaveinpfile Lib "epanet2.dll" (ByVal filename As String) As Int32
  Declare Function ENclose Lib "epanet2.dll" () As Int32
 
@@ -393,6 +400,7 @@ Public Const EN_TRUE  = 1   ' boolean true
  Declare Function ENsetpatternvalue Lib "epanet2.dll" (ByVal index As Int32, ByVal period As Int32, ByVal value As Single) As Int32
  Declare Function ENgetaveragepatternvalue Lib "epanet2.dll" (ByVal index As Int32, value As Single) As Int32
  Declare Function ENsetpattern Lib "epanet2.dll" (ByVal index As Int32, values As Any, ByVal len_ As Int32) As Int32
+ Declare Function ENloadpatternfile Lib "epanet2.dll" (ByVal filename As String, ByVal id As String) As Int32
 
 'Data Curve Functions
  Declare Function ENaddcurve Lib "epanet2.dll" (ByVal id As String) As Int32

@@ -1,13 +1,13 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       hydraul.c
  Description:  implements EPANET's hydraulic engine
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 06/26/2024
+ Last Updated: 04/19/2025
  ******************************************************************************
 */
 
@@ -41,6 +41,7 @@ void    tanklevels(Project *, long);
 void    resetpumpflow(Project *, int);
 void    getallpumpsenergy(Project *);
 
+
 int  openhyd(Project *pr)
 /*
  *--------------------------------------------------------------
@@ -71,7 +72,7 @@ int  openhyd(Project *pr)
     if (!errcode) for (i = 1; i <= pr->network.Nlinks; i++)
     {
         link = &pr->network.Link[i];
-        initlinkflow(pr, i, link->Status, link->Kc);
+        initlinkflow(pr, i, link->InitStatus, link->Kc);
     }
     else closehyd(pr);        
     return errcode;
@@ -124,16 +125,20 @@ void inithyd(Project *pr, int initflag)
         link->ResultIndex = i;
 
         // Initialize status and setting
-        hyd->LinkStatus[i] = link->Status;
-        hyd->LinkSetting[i] = link->Kc;
-
+        hyd->LinkStatus[i] = link->InitStatus;
+        hyd->LinkSetting[i] = link->InitSetting;
+        if (link->Type > PUMP && link->Type != GPV && link->InitStatus != ACTIVE)
+        {
+            hyd->LinkSetting[i] = MISSING;
+        }
+        
         // Compute flow resistance
         resistcoeff(pr, i);
 
         // Start active control valves in ACTIVE position
         if (
             (link->Type == PRV || link->Type == PSV
-            || link->Type == FCV) && (link->Kc != MISSING)
+            || link->Type == FCV) && (hyd->LinkSetting[i] != MISSING)
         ) hyd->LinkStatus[i] = ACTIVE;
 
         // Initialize flows if necessary
@@ -462,7 +467,7 @@ void  setlinksetting(Project *pr, int index, double value, StatusType *s,
     else
     {
         if (*k == MISSING && *s <= CLOSED) *s = OPEN;
-        if (t == PCV) link->R = pcvlosscoeff(pr, index, link->Kc);
+        if (t == PCV) link->R = pcvlosscoeff(pr, index, value);
         *k = value;
     }
 }

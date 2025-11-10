@@ -1,13 +1,13 @@
 /*
  ******************************************************************************
  Project:      OWA EPANET
- Version:      2.2
+ Version:      2.3
  Module:       funcs.h
  Description:  prototypes of external functions called by various modules
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 06/26/2024
+ Last Updated: 04/23/2025
  ******************************************************************************
 */
 #ifndef FUNCS_H
@@ -29,6 +29,7 @@ int     buildadjlists(Network *);
 void    freeadjlists(Network *);
 
 int     incontrols(Project *, int, int);
+int     changevalvetype(Project *, int, int);
 int     valvecheck(Project *, int, int, int, int);
 int     unlinked(Project *);
 
@@ -54,6 +55,8 @@ int     setcontrol(Project *, int, int, double, int, double, Scontrol *);
 
 int     getcomment(Network *, int, int, char *);
 int     setcomment(Network *, int, int, const char *);
+int     gettag(Network *, int, int, char *);
+int     settag(Network *, int, int, const char *);                                                  
 
 int     namevalid(const char *);
 void    getTmpName(char *);
@@ -109,6 +112,7 @@ int     reportdata(Project *);
 int     timedata(Project *);
 int     optiondata(Project *);
 int     vertexdata(Project *);
+int     tagdata(Project *);
 
 // ------- RULES.C ------------------
 

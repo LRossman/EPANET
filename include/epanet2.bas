@@ -5,7 +5,7 @@ Attribute VB_Name = "Module1"
 'Declarations of functions in the EPANET PROGRAMMERs TOOLKIT
 '(EPANET2.DLL)
 
-'Last updated on 06/23/2024
+'Last updated on 04/23/2025
 
 ' These are codes used by the DLL functions
 Public Const EN_ELEVATION = 0     ' Node parameters
@@ -71,6 +71,7 @@ Public Const EN_PCV_CURVE = 25
 Public Const EN_LEAK_AREA = 26
 Public Const EN_LEAK_EXPAN = 27
 Public Const EN_LINK_LEAKAGE = 28
+Public Const EN_VALVE_TYPE = 29
 
 Public Const EN_DURATION = 0      ' Time parameters
 Public Const EN_HYDSTEP = 1
@@ -165,6 +166,8 @@ Public Const EN_CMS = 10
 Public Const EN_PSI = 0           ' Pressure units types
 Public Const EN_KPA = 1
 Public Const EN_METERS = 2
+Public Const EN_BAR = 3
+Public Const EN_FEET = 4
 
 Public Const EN_DDA = 0           ' Demand driven analysis
 Public Const EN_PDA = 1           ' Pressure driven analysis
@@ -219,7 +222,7 @@ Public Const EN_INITFLOW = 10     ' Re-initialize flow flag
 Public Const EN_SAVE_AND_INIT = 11
 
 Public Const EN_CONST_HP = 0      ' Constant horsepower pump curve
-Public Const EN_POWER_FUNC = 1    ' Power function pump cuve
+Public Const EN_POWER_FUNC = 1    ' Power function pump curve
 Public Const EN_CUSTOM = 2        ' User-defined custom pump curve
 Public Const EN_NOCURVE = 3       ' No pump curve
 
@@ -297,8 +300,8 @@ Public Const EN_TRUE = 1    ' boolean true
  Declare Function ENclose Lib "epanet2.dll" () As Long
  Declare Function ENgetcomment Lib "epanet2.dll" (ByVal ObjectType As Long, ByVal index As Long, ByVal comment As String) As Long
  Declare Function ENsetcomment Lib "epanet2.dll" (ByVal ObjectType As Long, ByVal index As Long, ByVal comment As String) As Long
-
-
+ Declare Function ENgettag Lib "epanet2.dll" (ByVal ObjectType As Long, ByVal index As Long, ByVal tag As String) As Long
+  Declare Function ENsettag Lib "epanet2.dll" (ByVal ObjectType As Long, ByVal index As Long, ByVal tag As String) As Long
 'Hydraulic Analysis Functions
  Declare Function ENsolveH Lib "epanet2.dll" () As Long
  Declare Function ENsaveH Lib "epanet2.dll" () As Long
@@ -408,6 +411,7 @@ Public Const EN_TRUE = 1    ' boolean true
  Declare Function ENsetpatternvalue Lib "epanet2.dll" (ByVal index As Long, ByVal period As Long, ByVal value As Single) As Long
  Declare Function ENgetaveragepatternvalue Lib "epanet2.dll" (ByVal index As Long, value As Single) As Long
  Declare Function ENsetpattern Lib "epanet2.dll" (ByVal index As Long, values As Any, ByVal len_ As Long) As Long
+ Declare Function ENloadpatternfile Lib "epanet2.dll" (ByVal filename As String, ByVal id As String) As Long
 
 'Data Curve Functions
  Declare Function ENaddcurve Lib "epanet2.dll" (ByVal id As String) As Long
