@@ -216,13 +216,14 @@ StatusType  pumpstatus(Project *pr, int k, double dh)
     int   p;
     double hmax;
 
-    // Find maximum head (hmax) pump can deliver
     p = findpump(net, k);
+
+    // For constant HP pump, shutoff at low flow
+    // (0.0001 cfs = 0.05 gpm = 0.2 lpm)
     if (net->Pump[p].Ptype == CONST_HP)
     {
-        // Use huge value for constant HP pump
-        hmax = BIG;
-        if (hyd->LinkFlow[k] < TINY) return TEMPCLOSED;
+        if (hyd->LinkFlow[k] < 0.0001) return XHEAD;
+        else return OPEN;
     }
     else
     {
