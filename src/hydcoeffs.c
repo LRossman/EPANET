@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 06/15/2024
+ Last Updated: 11/10/2025
  ******************************************************************************
 */
 
@@ -804,7 +804,7 @@ void  pumpcoeff(Project *pr, int k)
            hloss,            // Head loss across pump
            hgrad;            // Head loss gradient
     Spump  *pump;
-
+    
     // Use high resistance pipe if pump closed or cannot deliver head
     setting = hyd->LinkSetting[k];
     if (hyd->LinkStatus[k] <= CLOSED || setting == 0.0)
@@ -856,30 +856,8 @@ void  pumpcoeff(Project *pr, int k)
         // Constant HP pump
         if (pump->Ptype == CONST_HP)
         {
-            // ... compute pump curve's gradient
             hgrad = -r / q / q;
-            
-            // ... treat as closed link if gradient too large
-            if (hgrad > CBIG)
-            {
-                hyd->P[k] = 1.0 / CBIG;
-                hyd->Y[k] = hyd->LinkFlow[k];
-                return;
-            }
-            
-            // ... treat as open valve if gradient too small
-            else if (hgrad < CSMALL)
-            {
-                hyd->P[k] = 1.0 / CSMALL;
-                hyd->Y[k] = hyd->LinkFlow[k];
-                return;
-            }    
-
-            // ... otherwise compute head loss from pump curve
-            else
-            {
-                hloss = r / hyd->LinkFlow[k];
-            }
+            hloss = r / hyd->LinkFlow[k];           
         }            
 
         // Compute head loss and its gradient
@@ -888,6 +866,7 @@ void  pumpcoeff(Project *pr, int k)
         {
             // ... compute pump curve's gradient
             hgrad = n * r * pow(q, n - 1.0);
+            
             // ... use linear pump curve if gradient too small
             if (hgrad < hyd->RQtol)
             {
