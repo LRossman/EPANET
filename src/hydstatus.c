@@ -7,7 +7,7 @@ Description:  updates hydraulic status of network elements
 Authors:      see AUTHORS
 Copyright:    see AUTHORS
 License:      see LICENSE
-Last Updated: 02/03/2023
+Last Updated: 11/11/2025
 ******************************************************************************
 */
 
@@ -217,17 +217,14 @@ StatusType  pumpstatus(Project *pr, int k, double dh)
     double hmax;
 
     p = findpump(net, k);
+    
+    // Constant HP pump doesn't have a shutoff head
+    if (net->Pump[p].Ptype == CONST_HP) return OPEN;
 
-    // For constant HP pump, shutoff at low flow
-    // (0.0001 cfs = 0.05 gpm = 0.2 lpm)
-    if (net->Pump[p].Ptype == CONST_HP)
-    {
-        if (hyd->LinkFlow[k] < 0.0001) return XHEAD;
-        else return OPEN;
-    }
+    // Otherwise find maximum head (hmax) pump can deliver
     else
     {
-        // Use speed-adjusted shut-off head for other pumps
+        // Use speed-adjusted shut-off head
         hmax = SQR(hyd->LinkSetting[k]) * net->Pump[p].Hmax;
     }
 
@@ -331,8 +328,8 @@ StatusType  psvstatus(Project *pr, int k, StatusType s, double hset,
     switch (s)
     {
     case ACTIVE:
-        if (hyd->LinkFlow[k] < -hyd->Qtol) status = CLOSED;
-        else if (h2 + hml > hset + htol)    status = OPEN;
+        if (hyd->LinkFlow[k] < -hyd->Qtol)  status = CLOSED;
+        else if (h2 + hml > hset + htol)    status = OPEN;     
         else                                status = ACTIVE;
         break;
 

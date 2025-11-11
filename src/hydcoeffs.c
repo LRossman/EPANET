@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 11/10/2025
+ Last Updated: 11/11/2025
  ******************************************************************************
 */
 
@@ -856,8 +856,9 @@ void  pumpcoeff(Project *pr, int k)
         // Constant HP pump
         if (pump->Ptype == CONST_HP)
         {
-            hgrad = -r / q / q;
-            hloss = r / hyd->LinkFlow[k];           
+            if (q < hyd->Qtol) q = hyd->Qtol;
+            hgrad = r * n / q / q;
+            hloss = -hgrad * q;
         }            
 
         // Compute head loss and its gradient
