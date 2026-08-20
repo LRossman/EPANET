@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 08/14/2026
+ Last Updated: 08/19/2026
  ******************************************************************************
 */
 
@@ -24,11 +24,13 @@
 #include "text.h"
 #include "enumstxt.h"
 
+
 #ifdef _WIN32
 #define snprintf _snprintf
 #endif
 
 #ifdef LUA_SCRIPTING
+#include "epanet2_lua.h"
 #include "lua/luaevents.h"
 #endif
 
@@ -6063,4 +6065,15 @@ int  DLLEXPORT EN_setruleenabled(EN_Project p, int index, int enabled)
     return 0;
 }
 
+#ifdef LUA_SCRIPTING
+LUADLLEXPORT void* STDCALL EN_getlua(EN_Project ph)
+{
+    return (ph->lua);
+}
+
+LUADLLEXPORT void STDCALL EN_setlua(EN_Project ph, LuaEnginePtr lua)
+{
+    ph->lua = lua;
+}
+#endif
 

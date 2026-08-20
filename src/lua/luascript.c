@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 08/14/2026
+ Last Updated: 08/19/2026
  ******************************************************************************
 */
 
@@ -19,38 +19,52 @@
 #include "luascript.h"
 #include "luafuncs.h"
 #include "luaevents.h"
-#include "funcs.h"
-#include "text.h"
+#include "epanet2_2.h"
+#include "epanet2_lua.h"
 
-void luascript_setChanged(Project *pr)
+#define FMT86  "Lua script error while parsing: %s"
+#define FMT87  "Lua script error: %s"
+
+// Script errors are only reported when status reporting is enabled
+static int statusReportingEnabled(EN_Project pr)
 {
-    if (pr->lua != NULL) pr->lua->changed = TRUE;
+    double level = EN_NO_REPORT;
+
+    if (EN_getoption(pr, EN_STATUS_REPORT, &level) != 0) return EN_FALSE;
+    return (int)level != EN_NO_REPORT;
 }
 
-int luascript_addScriptLine(Project *pr, char *line)
+void luascript_setChanged(EN_Project pr)
+{
+    struct LuaEngine* lua = (struct LuaEngine *)EN_getlua(pr);
+    if (lua != NULL) lua->changed = EN_TRUE;
+}
+
+int luascript_addScriptLine(EN_Project pr, char *line)
 {
     size_t line_len = strlen(line);
+    struct LuaEngine* lua = (struct LuaEngine *)EN_getlua(pr);
 
-    if (pr->lua == NULL)
+    if (lua == NULL)
     {
         return 311;
     }
     
-    if (pr->lua->script == NULL)
+    if (lua->script == NULL)
     {
-        pr->lua->script = malloc(line_len+1);
-        if (pr->lua->script == NULL)
+        lua->script = malloc(line_len+1);
+        if (lua->script == NULL)
         {
             return 101;
         }
         
-        memcpy(pr->lua->script, line, line_len);
-        pr->lua->script[line_len] = '\0';
+        memcpy(lua->script, line, line_len);
+        lua->script[line_len] = '\0';
     }
     else
     {
-        size_t prev_len = strlen(pr->lua->script);
-        char *buffer = realloc(pr->lua->script, prev_len + line_len + 1);
+        size_t prev_len = strlen(lua->script);
+        char *buffer = realloc(lua->script, prev_len + line_len + 1);
         if (buffer == NULL)
         {
             return 101;
@@ -58,110 +72,114 @@ int luascript_addScriptLine(Project *pr, char *line)
 
         memcpy(buffer + prev_len, line, line_len);
         buffer[line_len + prev_len] = '\0';
-        pr->lua->script = buffer;
+        lua->script = buffer;
     }
 
     return 0;
 }
 
-const char *luascript_getScript(Project *pr)
+const char *luascript_getScript(EN_Project pr)
 {
-    if (pr->lua == NULL) return NULL;
-    return pr->lua->script;
+    struct LuaEngine* lua = (struct LuaEngine *)EN_getlua(pr);
+    if (lua == NULL) return NULL;
+    return lua->script;
 }
 
-int luascript_open(Project *pr)
+int luascript_open(EN_Project pr)
 {
-    pr->lua = calloc(1, sizeof(LuaEngine));
-    if (pr->lua == NULL)
+    struct LuaEngine* lua = (struct LuaEngine*)calloc(1, sizeof(struct LuaEngine));
+    EN_setlua(pr, lua);
+    if (lua == NULL)
     {
         return 101;
     }
 
-    pr->lua->global_closure_ref = LUA_NOREF;
+    lua->global_closure_ref = LUA_NOREF;
 
-    pr->lua->engine = luaL_newstate();
-    if (pr->lua->engine == NULL)
+    lua->engine = luaL_newstate();
+    if (lua->engine == NULL)
     {
         return 310;
     }
 
-    luaL_openlibs(pr->lua->engine);
-    luafuncs_register(pr->lua->engine, pr);
+    luaL_openlibs(lua->engine);
+    luafuncs_register(lua->engine, pr);
 
     return 0;
 }
 
-static int run_lua_script(Project *pr, int *changed)
+static int run_lua_script(EN_Project pr, int *changed)
 {
-    if (changed != NULL) *changed = FALSE;
-
-    if (pr->lua == NULL || pr->lua->engine == NULL || pr->lua->global_closure_ref == LUA_NOREF)
+    if (changed != NULL) *changed = EN_FALSE;
+    struct LuaEngine* lua = (struct LuaEngine *)EN_getlua(pr);
+    if (lua == NULL || lua->engine == NULL || lua->global_closure_ref == LUA_NOREF)
     {
         return 0;
     }
 
-    pr->lua->changed = FALSE;
+    lua->changed = EN_FALSE;
 
-    lua_rawgeti(pr->lua->engine, LUA_REGISTRYINDEX, pr->lua->global_closure_ref);
-    if (lua_pcall(pr->lua->engine, 0, 0, 0) != LUA_OK)
+    lua_rawgeti(lua->engine, LUA_REGISTRYINDEX, lua->global_closure_ref);
+    if (lua_pcall(lua->engine, 0, 0, 0) != LUA_OK)
     {
-        if (pr->report.Statflag != FALSE)
+        if (statusReportingEnabled(pr))
         {
-            char msg[MAXMSG + 1];
-            snprintf(msg, MAXMSG, FMT87, lua_tostring(pr->lua->engine, -1));
-            writeline(pr, msg);
+            char msg[EN_MAXMSG + 1];
+            snprintf(msg, EN_MAXMSG, FMT87, lua_tostring(lua->engine, -1));
+            EN_writeline(pr, msg);
         }
-        lua_pop(pr->lua->engine, 1);
+        lua_pop(lua->engine, 1);
         return 313;
     }
 
-    if (changed != NULL) *changed = pr->lua->changed;
+    if (changed != NULL) *changed = lua->changed;
     return 0;
 }
 
-int luascript_parseScript(Project *pr)
+int luascript_parseScript(EN_Project pr)
 {
-    if (pr->lua == NULL || pr->lua->engine == NULL)
+    struct LuaEngine* lua = (struct LuaEngine *)EN_getlua(pr);
+    if (lua == NULL || lua->engine == NULL)
     {
         return 311;
     }
 
-    if (pr->lua->script == NULL)
+    if (lua->script == NULL)
     {
         return 0;
     }
 
-    if (luaL_loadstring(pr->lua->engine, pr->lua->script) != LUA_OK)
+    if (luaL_loadstring(lua->engine, lua->script) != LUA_OK)
     {
-        if (pr->report.Statflag != FALSE)
+        if (statusReportingEnabled(pr))
         {
-            char msg[MAXMSG + 1];
-            snprintf(msg, MAXMSG, FMT86, lua_tostring(pr->lua->engine, -1));
-            writeline(pr, msg);
+            char msg[EN_MAXMSG + 1];
+            snprintf(msg, EN_MAXMSG, FMT86, lua_tostring(lua->engine, -1));
+            EN_writeline(pr, msg);
         }
-        lua_pop(pr->lua->engine, 1);
+        lua_pop(lua->engine, 1);
         return 312;
     }
-    pr->lua->global_closure_ref = luaL_ref(pr->lua->engine, LUA_REGISTRYINDEX);
+    lua->global_closure_ref = luaL_ref(lua->engine, LUA_REGISTRYINDEX);
 
     // The load-time evaluation runs against a network that has not been
     // solved yet, so an error in it is reported but left to be raised by
     // the first pass of the run proper
     run_lua_script(pr, NULL);
-    pr->lua->changed = FALSE;
+    lua->changed = EN_FALSE;
 
     return 0;
 }
 
-int luascript_runIteration(Project *pr, int *changed)
+int luascript_runIteration(EN_Project pr, int *changed)
 {
-    if (changed != NULL) *changed = FALSE;
-    if (pr->lua == NULL || pr->lua->engine == NULL) return 0;
+    if (changed != NULL) *changed = EN_FALSE;
+    struct LuaEngine* lua = (struct LuaEngine *)EN_getlua(pr);
+    if (lua == NULL || lua->engine == NULL) return 0;
 
-    lua_getglobal(pr->lua->engine, "on_hydraulic_step");
-    int hasHandler = lua_isfunction(pr->lua->engine, -1);
-    lua_pop(pr->lua->engine, 1);
+    lua_getglobal(lua->engine, "on_hydraulic_step");
+    int hasHandler = lua_isfunction(lua->engine, -1);
+    lua_pop(lua->engine, 1);
 
     if (hasHandler)
     {
@@ -170,22 +188,23 @@ int luascript_runIteration(Project *pr, int *changed)
     return run_lua_script(pr, changed);
 }
 
-void luascript_close(Project *pr)
+void luascript_close(EN_Project pr)
 {
-    if (pr->lua != NULL)
+    struct LuaEngine* lua = (struct LuaEngine *)EN_getlua(pr);    
+    if (lua != NULL)
     {
-        if (pr->lua->engine != NULL)
+        if (lua->engine != NULL)
         {
-            if (pr->lua->global_closure_ref != LUA_NOREF)
+            if (lua->global_closure_ref != LUA_NOREF)
             {
-                luaL_unref(pr->lua->engine, LUA_REGISTRYINDEX,
-                           pr->lua->global_closure_ref);
+                luaL_unref(lua->engine, LUA_REGISTRYINDEX,
+                           lua->global_closure_ref);
             }
-            lua_close(pr->lua->engine);
+            lua_close(lua->engine);
         }
-        free(pr->lua->script);
-        free(pr->lua);
-        pr->lua = NULL;
+        free(lua->script);
+        free(lua);
+        lua = NULL;
     }
 }
 #endif // LUA_SCRIPTING

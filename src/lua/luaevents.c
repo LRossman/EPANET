@@ -7,16 +7,17 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 08/14/2026
+ Last Updated: 08/19/2026
  ******************************************************************************
 */
 
 #ifdef LUA_SCRIPTING
-#include "types.h"
-#include "funcs.h"
-#include "text.h"
+#include "epanet2_2.h"
+#include "epanet2_lua.h"
 #include "luatypes.h"
 #include "luaevents.h"
+ 
+#define FMT88  "Lua script error in %s: %s"
 
 static const char *event_name[LUA_EVENT_MAX] = {
     "on_open",
@@ -25,44 +26,54 @@ static const char *event_name[LUA_EVENT_MAX] = {
     "on_hydraulic_step"
 };
 
-int luascript_onEvent(Project *pr, LuaEvent event, int *changed)
+// Script errors are only reported when status reporting is enabled
+static int statusReportingEnabled(EN_Project pr)
 {
-    if (changed != NULL) *changed = FALSE;
+    double level = EN_NO_REPORT;
 
-    if (pr->lua == NULL || pr->lua->engine == NULL || pr->lua->script == NULL)
+    if (EN_getoption(pr, EN_STATUS_REPORT, &level) != 0) return EN_FALSE;
+    return (int)level != EN_NO_REPORT;
+}
+
+int luascript_onEvent(EN_Project pr, LuaEvent event, int *changed)
+{
+    if (changed != NULL) *changed = EN_FALSE;
+
+    struct LuaEngine* lua = (struct LuaEngine *)EN_getlua(pr);
+    if (lua == NULL || lua->engine == NULL || lua->script == NULL)
     {
         return 0;
     }
 
-    pr->lua->changed = FALSE;
+    lua->changed = EN_FALSE;
 
-    lua_getglobal(pr->lua->engine, event_name[event]);
-    int event_defined = lua_isfunction(pr->lua->engine, -1);
+    lua_getglobal(lua->engine, event_name[event]);
+    int event_defined = lua_isfunction(lua->engine, -1);
     if (!event_defined)
     {
-        lua_pop(pr->lua->engine, 1);
+        lua_pop(lua->engine, 1);
         return 0;
     }
 
-    pr->lua->timed_event = (event == LUA_EVENT_HYDRAULIC_STEP ||
+    lua->timed_event = (event == LUA_EVENT_HYDRAULIC_STEP ||
                             event == LUA_EVENT_HYDRAULICS_SOLVED);
-    int execution_result = lua_pcall(pr->lua->engine, 0, 0, 0);
-    pr->lua->timed_event = FALSE;
+    int execution_result = lua_pcall(lua->engine, 0, 0, 0);
+    lua->timed_event = EN_FALSE;
 
     if (execution_result != LUA_OK)
     {
-        if (pr->report.Statflag != FALSE)
+        if (statusReportingEnabled(pr))
         {
-            char msg[MAXMSG + 1];
-            snprintf(msg, MAXMSG, FMT88, event_name[event],
-                lua_tostring(pr->lua->engine, -1));
-            writeline(pr, msg);
+            char msg[EN_MAXMSG + 1];
+            snprintf(msg, EN_MAXMSG, FMT88, event_name[event],
+                lua_tostring(lua->engine, -1));
+            EN_writeline(pr, msg);
         }
-        lua_pop(pr->lua->engine, 1);
+        lua_pop(lua->engine, 1);
         return 313;
     }
 
-    if (changed != NULL) *changed = pr->lua->changed;
+    if (changed != NULL) *changed = lua->changed;
     return 0;
 }
 #endif // LUA_SCRIPTING

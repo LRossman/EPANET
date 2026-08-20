@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 08/14/2026
+ Last Updated: 08/19/2026
  ******************************************************************************
 */
 
@@ -16,9 +16,9 @@
 #define LUA_FUNCS_H
 
 #include "minilua.h"
-#include "types.h"
+typedef struct Project* EN_Project;
 
-void luafuncs_register(lua_State *L, Project *pr);
+void luafuncs_register(lua_State *L, EN_Project pr);
 
 #endif // LUA_FUNCS_H
 #endif // LUA_SCRIPTING

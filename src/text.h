@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 08/14/2026
+ Last Updated: 08/18/2026
  ******************************************************************************
 */
 
@@ -471,12 +471,7 @@
 //----- Lua Script Report Messages ------------------------
 
 #ifdef LUA_SCRIPTING
-#define FMT83  "%10s: [SCRIPT] "
-#define FMT84  "[SCRIPT] "
 #define FMT85  "%10s: Lua script changed status - re-solving (pass %d)"
-#define FMT86  "Lua script error while parsing: %s"
-#define FMT87  "Lua script error: %s"
-#define FMT88  "Lua script error in %s: %s"
 #endif // LUA_SCRIPTING
 
 //----- Progress Messages ---------------------------------

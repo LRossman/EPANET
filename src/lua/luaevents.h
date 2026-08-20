@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 08/14/2026
+ Last Updated: 08/19/2026
  ******************************************************************************
 */
 
@@ -15,7 +15,7 @@
 #ifndef LUAEVENTS_H
 #define LUAEVENTS_H
 
-#include "types.h"
+typedef struct Project* EN_Project;
 
 typedef enum  {
   LUA_EVENT_OPEN,
@@ -25,7 +25,7 @@ typedef enum  {
   LUA_EVENT_MAX
 } LuaEvent;
 
-int luascript_onEvent(Project *pr, LuaEvent event, int *changed);
+int luascript_onEvent(EN_Project pr, LuaEvent event, int *changed);
 
 #endif // LUAEVENTS_H
 #endif // LUA_SCRIPTING

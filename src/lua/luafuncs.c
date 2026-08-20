@@ -7,7 +7,7 @@
  Authors:      see AUTHORS
  Copyright:    see AUTHORS
  License:      see LICENSE
- Last Updated: 08/14/2026
+ Last Updated: 08/19/2026
  ******************************************************************************
 */
 
@@ -15,14 +15,21 @@
 #include <string.h>
 #include "luascript.h"
 #include "luatypes.h"
-#include "funcs.h"
-#include "text.h"
-#include "epanet2_2.h"
 #include "luafuncs.h"
+#include "epanet2_2.h"
+#include "epanet2_lua.h"
 
-#define LUA_READ_ONLY FALSE
-#define LUA_WRITABLE  TRUE
+#define LUA_READ_ONLY EN_FALSE
+#define LUA_WRITABLE  EN_TRUE
 #define NUM_API_FUNCS (sizeof(LuaApi) / sizeof(LuaApi[0]))
+
+#define TINY     1.E-6
+#define ABS(x)   (((x)<0) ? -(x) : (x))
+#define ROUND(x) (((x)>=0) ? (int)((x)+.5) : (int)((x)-.5))
+
+// Prefixes for script print() output, with and without a timestamp
+#define FMT83  "%10s: [SCRIPT] "
+#define FMT84  "[SCRIPT] "
 
 // An object exposed to Lua as userdata; the metatable attached to it
 // determines whether it is a node, a link or the project's options.
@@ -40,7 +47,7 @@ typedef struct
 } PropDesc;
 
 // An object type: its Lua-facing names, its property table and the
-// EPANET functions used to look it up and read/write its properties.
+// toolkit functions used to look it up and read/write its properties.
 // A NULL find marks a project-wide object, which takes no id and whose
 // index is unused; a NULL set marks one that is read only throughout
 typedef struct
@@ -48,7 +55,7 @@ typedef struct
     const char *metatable;
     const char *global;
     const PropDesc *props;
-    int (*find)(Network *, const char *);
+    int (*find)(EN_Project, const char *, int *);
     int (*get)(EN_Project, int, int, double *);
     int (*set)(EN_Project, int, int, double);
 } LuaApiFunc;
@@ -196,10 +203,10 @@ static int setTimeValue(EN_Project pr, int index, int code, double value)
 }
 
 static const LuaApiFunc LuaApi[] = {
-    { "epanet.node",    "node",    NodeProps,   findnode, EN_getnodevalue, EN_setnodevalue },
-    { "epanet.link",    "link",    LinkProps,   findlink, EN_getlinkvalue, EN_setlinkvalue },
-    { "epanet.options", "options", OptionProps, NULL,     getOptionValue,  NULL            },
-    { "epanet.times",   "times",   TimeProps,   NULL,     getTimeValue,    setTimeValue    }
+    { "epanet.node",    "node",    NodeProps,   EN_getnodeindex, EN_getnodevalue, EN_setnodevalue },
+    { "epanet.link",    "link",    LinkProps,   EN_getlinkindex, EN_getlinkvalue, EN_setlinkvalue },
+    { "epanet.options", "options", OptionProps, NULL,            getOptionValue,  NULL            },
+    { "epanet.times",   "times",   TimeProps,   NULL,            getTimeValue,    setTimeValue    }
 };
 
 static const PropDesc *findElementProperty(const PropDesc *props, const char *name)
@@ -219,19 +226,34 @@ static const char *stringOrEmpty(lua_State *lua, int arg)
     return s;
 }
 
+static int statusReportingEnabled(EN_Project pr)
+{
+    double level = EN_NO_REPORT;
+
+    if (EN_getoption(pr, EN_STATUS_REPORT, &level) != 0) return EN_FALSE;
+    return (int)level != EN_NO_REPORT;
+}
+
 static int lua_epanet_print(lua_State *lua)
 {
-    char buf[MAXMSG + 1];
-    Project *pr = lua_touserdata(lua, lua_upvalueindex(1));
+    char buf[EN_MAXMSG + 1];
+    EN_Project pr = lua_touserdata(lua, lua_upvalueindex(1));
     int nargs = lua_gettop(lua);
     int pos = 0;
 
-    if (pr->report.Statflag == FALSE) return 0;
+    if (!statusReportingEnabled(pr)) return 0;
 
-    if (pr->lua->timed_event)
+    struct LuaEngine* luaEngine = (struct LuaEngine *)EN_getlua(pr);
+
+    if (luaEngine->timed_event)
     {
-        pos += sprintf(buf, FMT83, clocktime(pr->report.Atime,
-                                             pr->times.Htime));
+        char atime[24];
+        long seconds = 0;
+
+        EN_gettimeparam(pr, EN_HTIME, &seconds);
+        snprintf(atime, sizeof(atime), "%01d:%02d:%02d", (int)(seconds / 3600),
+                 (int)(seconds % 3600 / 60), (int)(seconds % 60));
+        pos += sprintf(buf, FMT83, atime);
     }
     else pos += sprintf(buf, FMT84);
     for (int i = 1; i <= nargs; i++)
@@ -253,18 +275,21 @@ static int lua_epanet_print(lua_State *lua)
     }
 
     buf[pos] = '\0';
-    writeline(pr, buf);
+    EN_writeline(pr, buf);
 
     return 0;
 }
 
 static int lua_curve_points(lua_State *lua)
 {
-    Project *pr = lua_touserdata(lua, lua_upvalueindex(1));
+    EN_Project pr = lua_touserdata(lua, lua_upvalueindex(1));
     const char *id = luaL_checkstring(lua, 1);
 
-    int index = findcurve(&pr->network, id);
-    if (index == 0) return luaL_error(lua, "curve not found: %s", id);
+    int index = 0;
+    if (EN_getcurveindex(pr, id, &index) != 0)
+    {
+        return luaL_error(lua, "curve not found: %s", id);
+    }
 
     int npoints = 0;
     int err = EN_getcurvelen(pr, index, &npoints);
@@ -294,15 +319,15 @@ static int lua_curve_points(lua_State *lua)
 
 static int lua_elem_new(lua_State *lua)
 {
-    Project *pr = lua_touserdata(lua, lua_upvalueindex(1));
+    EN_Project pr = lua_touserdata(lua, lua_upvalueindex(1));
     const LuaApiFunc *d = lua_touserdata(lua, lua_upvalueindex(2));
     int index = 0;
 
     if (d->find != NULL)
     {
         const char *id = luaL_checkstring(lua, 1);
-        index = d->find(&pr->network, id);
-        if (index == 0) return luaL_error(lua, "%s not found: %s", d->global, id);
+        int err = d->find(pr, id, &index);
+        if (err) return luaL_error(lua, "%s not found: %s", d->global, id);
     }
 
     LuaElem *e = lua_newuserdata(lua, sizeof(LuaElem));
@@ -314,7 +339,7 @@ static int lua_elem_new(lua_State *lua)
 
 static int lua_elem_index(lua_State *lua)
 {
-    Project *pr = lua_touserdata(lua, lua_upvalueindex(1));
+    EN_Project pr = lua_touserdata(lua, lua_upvalueindex(1));
     const LuaApiFunc *d = lua_touserdata(lua, lua_upvalueindex(2));
     LuaElem *e = luaL_checkudata(lua, 1, d->metatable);
 
@@ -333,7 +358,7 @@ static int lua_elem_index(lua_State *lua)
 
 static int lua_elem_newindex(lua_State *lua)
 {
-    Project *pr = lua_touserdata(lua, lua_upvalueindex(1));
+    EN_Project pr = lua_touserdata(lua, lua_upvalueindex(1));
     const LuaApiFunc *d = lua_touserdata(lua, lua_upvalueindex(2));
     LuaElem *e = luaL_checkudata(lua, 1, d->metatable);
 
@@ -364,7 +389,7 @@ static int lua_elem_newindex(lua_State *lua)
     return 0;
 }
 
-static void registerFunction(lua_State *lua, const LuaApiFunc *fn, Project *pr)
+static void registerFunction(lua_State *lua, const LuaApiFunc *fn, EN_Project pr)
 {
     luaL_newmetatable(lua, fn->metatable);
     lua_pushlightuserdata(lua, pr);
@@ -384,7 +409,7 @@ static void registerFunction(lua_State *lua, const LuaApiFunc *fn, Project *pr)
     lua_setglobal(lua, fn->global);
 }
 
-void luafuncs_register(lua_State *lua, Project *pr)
+void luafuncs_register(lua_State *lua, EN_Project pr)
 {
     lua_pushlightuserdata(lua, pr);
     lua_pushcclosure(lua, lua_epanet_print, 1);
